@@ -65,7 +65,7 @@ func (api *KeyUpdaterAPI) WatchAuthorisedKeys(arg params.Entities) (params.Notif
 		}
 		// 2. Check entity exists
 		if _, err := api.state.FindEntity(entity.Tag); err != nil {
-			if errors.IsNotFoundError(err) {
+			if errors.IsNotFound(err) {
 				results[i].Error = common.ServerError(common.ErrPerm)
 			} else {
 				results[i].Error = common.ServerError(err)
@@ -83,7 +83,7 @@ func (api *KeyUpdaterAPI) WatchAuthorisedKeys(arg params.Entities) (params.Notif
 		}
 		results[i].Error = common.ServerError(err)
 	}
-	return params.NotifyWatchResults{results}, nil
+	return params.NotifyWatchResults{Results: results}, nil
 }
 
 // AuthorisedKeys reports the authorised ssh keys for the specified machines.
@@ -114,7 +114,7 @@ func (api *KeyUpdaterAPI) AuthorisedKeys(arg params.Entities) (params.StringsRes
 		}
 		// 2. Check entity exists
 		if _, err := api.state.FindEntity(entity.Tag); err != nil {
-			if errors.IsNotFoundError(err) {
+			if errors.IsNotFound(err) {
 				results[i].Error = common.ServerError(common.ErrPerm)
 			} else {
 				results[i].Error = common.ServerError(err)
@@ -130,5 +130,5 @@ func (api *KeyUpdaterAPI) AuthorisedKeys(arg params.Entities) (params.StringsRes
 		}
 		results[i].Error = common.ServerError(err)
 	}
-	return params.StringsResults{results}, nil
+	return params.StringsResults{Results: results}, nil
 }

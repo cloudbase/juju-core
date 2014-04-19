@@ -18,6 +18,7 @@ type MachinerAPI struct {
 	*common.StatusSetter
 	*common.DeadEnsurer
 	*common.AgentEntityWatcher
+	*common.APIAddresser
 
 	st           *state.State
 	auth         common.Authorizer
@@ -41,6 +42,7 @@ func NewMachinerAPI(st *state.State, resources *common.Resources, authorizer com
 		StatusSetter:       common.NewStatusSetter(st, getCanModify),
 		DeadEnsurer:        common.NewDeadEnsurer(st, getCanModify),
 		AgentEntityWatcher: common.NewAgentEntityWatcher(st, resources, getCanRead),
+		APIAddresser:       common.NewAPIAddresser(st, resources),
 		st:                 st,
 		auth:               authorizer,
 		getCanModify:       getCanModify,
@@ -69,8 +71,8 @@ func (api *MachinerAPI) SetMachineAddresses(args params.SetMachinesAddresses) (p
 			var m *state.Machine
 			m, err = api.getMachine(arg.Tag)
 			if err == nil {
-				err = m.SetMachineAddresses(arg.Addresses)
-			} else if errors.IsNotFoundError(err) {
+				err = m.SetMachineAddresses(arg.Addresses...)
+			} else if errors.IsNotFound(err) {
 				err = common.ErrPerm
 			}
 		}

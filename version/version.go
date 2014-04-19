@@ -18,16 +18,16 @@ import (
 
 	"labix.org/v2/mgo/bson"
 
+	"launchpad.net/juju-core/juju/arch"
 	"github.com/juju/loggo"
 )
 
 var logger = loggo.GetLogger("juju.version.version")
 
-
 // The presence and format of this constant is very important.
 // The debian/rules build recipe uses this value for the version
 // number of the release package.
-const version = "1.17.5"
+const version = "1.19.1"
 
 // lsbReleaseFile is the name of the file that is read in order to determine
 // the release version of ubuntu.
@@ -37,9 +37,9 @@ var lsbReleaseFile = "/etc/lsb-release"
 // "FORCE-VERSION" is present in the same directory as the running
 // binary, it will override this.
 var Current = Binary{
-    Number: MustParse(version),
-    Series: readSeries(lsbReleaseFile),
-    Arch:   ubuntuArch(runtime.GOARCH),
+	Number: MustParse(version),
+	Series: readSeries(lsbReleaseFile),
+	Arch:   arch.HostArch(),
 }
 
 func init() {
@@ -312,13 +312,6 @@ func isOdd(x int) bool {
 // version.
 func (v Number) IsDev() bool {
 	return isOdd(v.Minor) || v.Build > 0
-}
-
-func ubuntuArch(arch string) string {
-    if arch == "386" {
-        arch = "i386"
-    }
-    return arch
 }
 
 // ParseMajorMinor takes an argument of the form "major.minor" and returns ints major and minor.

@@ -18,7 +18,7 @@ import (
 	"launchpad.net/juju-core/charm"
 	"launchpad.net/juju-core/testing"
 	"launchpad.net/juju-core/testing/testbase"
-    "launchpad.net/juju-core/utils"
+	"launchpad.net/juju-core/utils"
 )
 
 type DirSuite struct {
@@ -144,7 +144,7 @@ func (s *DirSuite) TestBundleToWithNonExecutableHooks(c *gc.C) {
 	tlog := c.GetTestLog()
 	for _, hook := range hooks {
 		fullpath := filepath.Join(dir.Path, "hooks", hook)
-		exp := fmt.Sprintf(`^(.|\n)*WARNING juju charm: making "%s" executable in charm(.|\n)*$`, fullpath)
+		exp := fmt.Sprintf(`^(.|\n)*WARNING juju.charm making "%s" executable in charm(.|\n)*$`, fullpath)
 		c.Assert(tlog, gc.Matches, exp, gc.Commentf("hook %q was not made executable", fullpath))
 	}
 

@@ -6,20 +6,21 @@ package provisioner_test
 import (
 	stdtesting "testing"
 
+	jc "github.com/juju/testing/checkers"
 	gc "launchpad.net/gocheck"
 
 	"launchpad.net/juju-core/constraints"
 	"launchpad.net/juju-core/errors"
 	"launchpad.net/juju-core/instance"
 	"launchpad.net/juju-core/juju/testing"
+	"launchpad.net/juju-core/names"
 	"launchpad.net/juju-core/state"
 	"launchpad.net/juju-core/state/api"
-	commontesting "launchpad.net/juju-core/state/api/common/testing"
 	"launchpad.net/juju-core/state/api/params"
 	"launchpad.net/juju-core/state/api/provisioner"
+	apitesting "launchpad.net/juju-core/state/api/testing"
 	statetesting "launchpad.net/juju-core/state/testing"
 	coretesting "launchpad.net/juju-core/testing"
-	jc "launchpad.net/juju-core/testing/checkers"
 	"launchpad.net/juju-core/tools"
 	"launchpad.net/juju-core/utils"
 	"launchpad.net/juju-core/version"
@@ -31,7 +32,8 @@ func TestAll(t *stdtesting.T) {
 
 type provisionerSuite struct {
 	testing.JujuConnSuite
-	*commontesting.EnvironWatcherTest
+	*apitesting.EnvironWatcherTests
+	*apitesting.APIAddresserTests
 
 	st      *api.State
 	machine *state.Machine
@@ -51,16 +53,19 @@ func (s *provisionerSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	err = s.machine.SetPassword(password)
 	c.Assert(err, gc.IsNil)
-	err = s.machine.SetProvisioned("i-manager", "fake_nonce", nil)
+	err = s.machine.SetInstanceInfo("i-manager", "fake_nonce", nil, nil, nil)
 	c.Assert(err, gc.IsNil)
 	s.st = s.OpenAPIAsMachine(c, s.machine.Tag(), password, "fake_nonce")
 	c.Assert(s.st, gc.NotNil)
+	err = s.machine.SetAddresses(instance.NewAddress("0.1.2.3", instance.NetworkUnknown))
+	c.Assert(err, gc.IsNil)
 
 	// Create the provisioner API facade.
 	s.provisioner = s.st.Provisioner()
 	c.Assert(s.provisioner, gc.NotNil)
 
-	s.EnvironWatcherTest = commontesting.NewEnvironWatcherTest(s.provisioner, s.State, s.BackingState, commontesting.HasSecrets)
+	s.EnvironWatcherTests = apitesting.NewEnvironWatcherTests(s.provisioner, s.BackingState, apitesting.HasSecrets)
+	s.APIAddresserTests = apitesting.NewAPIAddresserTests(s.provisioner, s.BackingState)
 }
 
 func (s *provisionerSuite) TestMachineTagAndId(c *gc.C) {
@@ -84,13 +89,51 @@ func (s *provisionerSuite) TestGetSetStatus(c *gc.C) {
 	c.Assert(status, gc.Equals, params.StatusPending)
 	c.Assert(info, gc.Equals, "")
 
-	err = apiMachine.SetStatus(params.StatusStarted, "blah")
+	err = apiMachine.SetStatus(params.StatusStarted, "blah", nil)
 	c.Assert(err, gc.IsNil)
 
 	status, info, err = apiMachine.Status()
 	c.Assert(err, gc.IsNil)
 	c.Assert(status, gc.Equals, params.StatusStarted)
 	c.Assert(info, gc.Equals, "blah")
+	_, _, data, err := s.machine.Status()
+	c.Assert(err, gc.IsNil)
+	c.Assert(data, gc.HasLen, 0)
+}
+
+func (s *provisionerSuite) TestGetSetStatusWithData(c *gc.C) {
+	apiMachine, err := s.provisioner.Machine(s.machine.Tag())
+	c.Assert(err, gc.IsNil)
+
+	err = apiMachine.SetStatus(params.StatusError, "blah", params.StatusData{"foo": "bar"})
+	c.Assert(err, gc.IsNil)
+
+	status, info, err := apiMachine.Status()
+	c.Assert(err, gc.IsNil)
+	c.Assert(status, gc.Equals, params.StatusError)
+	c.Assert(info, gc.Equals, "blah")
+	_, _, data, err := s.machine.Status()
+	c.Assert(err, gc.IsNil)
+	c.Assert(data, gc.DeepEquals, params.StatusData{"foo": "bar"})
+}
+
+func (s *provisionerSuite) TestMachinesWithTransientErrors(c *gc.C) {
+	machine, err := s.State.AddMachine("quantal", state.JobHostUnits)
+	c.Assert(err, gc.IsNil)
+	err = machine.SetStatus(params.StatusError, "blah", params.StatusData{"transient": true})
+	c.Assert(err, gc.IsNil)
+	machines, info, err := s.provisioner.MachinesWithTransientErrors()
+	c.Assert(err, gc.IsNil)
+	c.Assert(machines, gc.HasLen, 1)
+	c.Assert(machines[0].Id(), gc.Equals, "1")
+	c.Assert(info, gc.HasLen, 1)
+	c.Assert(info[0], gc.DeepEquals, params.StatusResult{
+		Id:     "1",
+		Life:   "alive",
+		Status: "error",
+		Info:   "blah",
+		Data:   params.StatusData{"transient": true},
+	})
 }
 
 func (s *provisionerSuite) TestEnsureDeadAndRemove(c *gc.C) {
@@ -120,7 +163,7 @@ func (s *provisionerSuite) TestEnsureDeadAndRemove(c *gc.C) {
 	err = apiMachine.Remove()
 	c.Assert(err, gc.IsNil)
 	err = otherMachine.Refresh()
-	c.Assert(err, jc.Satisfies, errors.IsNotFoundError)
+	c.Assert(err, jc.Satisfies, errors.IsNotFound)
 
 	err = apiMachine.EnsureDead()
 	c.Assert(err, gc.ErrorMatches, "machine 1 not found")
@@ -152,7 +195,7 @@ func (s *provisionerSuite) TestRefreshAndLife(c *gc.C) {
 	c.Assert(apiMachine.Life(), gc.Equals, params.Dead)
 }
 
-func (s *provisionerSuite) TestSetProvisionedAndInstanceId(c *gc.C) {
+func (s *provisionerSuite) TestSetInstanceInfo(c *gc.C) {
 	// Create a fresh machine, since machine 0 is already provisioned.
 	notProvisionedMachine, err := s.State.AddMachine("quantal", state.JobHostUnits)
 	c.Assert(err, gc.IsNil)
@@ -166,7 +209,70 @@ func (s *provisionerSuite) TestSetProvisionedAndInstanceId(c *gc.C) {
 	c.Assert(instanceId, gc.Equals, instance.Id(""))
 
 	hwChars := instance.MustParseHardware("cpu-cores=123", "mem=4G")
-	err = apiMachine.SetProvisioned("i-will", "fake_nonce", &hwChars)
+
+	_, err = s.State.Network("net1")
+	c.Assert(err, jc.Satisfies, errors.IsNotFound)
+	_, err = s.State.Network("vlan42")
+	c.Assert(err, jc.Satisfies, errors.IsNotFound)
+
+	ifacesMachine, err := notProvisionedMachine.NetworkInterfaces()
+	c.Assert(err, gc.IsNil)
+	c.Assert(ifacesMachine, gc.HasLen, 0)
+
+	networks := []params.Network{{
+		Tag:        "network-net1",
+		ProviderId: "net1",
+		CIDR:       "0.1.2.0/24",
+		VLANTag:    0,
+	}, {
+		Tag:        "network-vlan42",
+		ProviderId: "vlan42",
+		CIDR:       "0.2.2.0/24",
+		VLANTag:    42,
+	}, {
+		Tag:        "network-vlan69",
+		ProviderId: "vlan69",
+		CIDR:       "0.3.2.0/24",
+		VLANTag:    69,
+	}, {
+		Tag:        "network-vlan42", // duplicated; ignored
+		ProviderId: "vlan42",
+		CIDR:       "0.2.2.0/24",
+		VLANTag:    42,
+	}}
+	ifaces := []params.NetworkInterface{{
+		MACAddress:    "aa:bb:cc:dd:ee:f0",
+		NetworkTag:    "network-net1",
+		InterfaceName: "eth0",
+		IsVirtual:     false,
+	}, {
+		MACAddress:    "aa:bb:cc:dd:ee:f1",
+		NetworkTag:    "network-net1",
+		InterfaceName: "eth1",
+		IsVirtual:     false,
+	}, {
+		MACAddress:    "aa:bb:cc:dd:ee:f1",
+		NetworkTag:    "network-vlan42",
+		InterfaceName: "eth1.42",
+		IsVirtual:     true,
+	}, {
+		MACAddress:    "aa:bb:cc:dd:ee:f1",
+		NetworkTag:    "network-vlan69",
+		InterfaceName: "eth1.69",
+		IsVirtual:     true,
+	}, {
+		MACAddress:    "aa:bb:cc:dd:ee:f1", // duplicated mac+net; ignored
+		NetworkTag:    "network-vlan42",
+		InterfaceName: "eth2",
+		IsVirtual:     true,
+	}, {
+		MACAddress:    "aa:bb:cc:dd:ee:f4",
+		NetworkTag:    "network-net1",
+		InterfaceName: "eth1", // duplicated name+machine id; ignored
+		IsVirtual:     false,
+	}}
+
+	err = apiMachine.SetInstanceInfo("i-will", "fake_nonce", &hwChars, networks, ifaces)
 	c.Assert(err, gc.IsNil)
 
 	instanceId, err = apiMachine.InstanceId()
@@ -174,8 +280,8 @@ func (s *provisionerSuite) TestSetProvisionedAndInstanceId(c *gc.C) {
 	c.Assert(instanceId, gc.Equals, instance.Id("i-will"))
 
 	// Try it again - should fail.
-	err = apiMachine.SetProvisioned("i-wont", "fake", nil)
-	c.Assert(err, gc.ErrorMatches, `cannot set instance data for machine "1": already set`)
+	err = apiMachine.SetInstanceInfo("i-wont", "fake", nil, nil, nil)
+	c.Assert(err, gc.ErrorMatches, `aborted instance "i-wont": cannot set instance data for machine "1": already set`)
 
 	// Now try to get machine 0's instance id.
 	apiMachine, err = s.provisioner.Machine(s.machine.Tag())
@@ -183,6 +289,38 @@ func (s *provisionerSuite) TestSetProvisionedAndInstanceId(c *gc.C) {
 	instanceId, err = apiMachine.InstanceId()
 	c.Assert(err, gc.IsNil)
 	c.Assert(instanceId, gc.Equals, instance.Id("i-manager"))
+
+	// Check the networks are created.
+	for i, _ := range networks {
+		if i == 3 {
+			// Last one was ignored, so skip it.
+			break
+		}
+		_, networkName, err := names.ParseTag(networks[i].Tag, names.NetworkTagKind)
+		c.Assert(err, gc.IsNil)
+		network, err := s.State.Network(networkName)
+		c.Assert(err, gc.IsNil)
+		c.Check(network.Name(), gc.Equals, networkName)
+		c.Check(network.ProviderId(), gc.Equals, networks[i].ProviderId)
+		c.Check(network.Tag(), gc.Equals, networks[i].Tag)
+		c.Check(network.VLANTag(), gc.Equals, networks[i].VLANTag)
+		c.Check(network.CIDR(), gc.Equals, networks[i].CIDR)
+	}
+
+	// And the network interfaces as well.
+	ifacesMachine, err = notProvisionedMachine.NetworkInterfaces()
+	c.Assert(err, gc.IsNil)
+	c.Assert(ifacesMachine, gc.HasLen, 4)
+	actual := make([]params.NetworkInterface, len(ifacesMachine))
+	for i, iface := range ifacesMachine {
+		actual[i].InterfaceName = iface.InterfaceName()
+		actual[i].NetworkTag = iface.NetworkTag()
+		actual[i].MACAddress = iface.MACAddress()
+		actual[i].IsVirtual = iface.IsVirtual()
+		c.Check(iface.MachineTag(), gc.Equals, notProvisionedMachine.Tag())
+		c.Check(iface.MachineId(), gc.Equals, notProvisionedMachine.Id())
+	}
+	c.Assert(actual, jc.SameContents, ifaces[:4]) // skip the rest as they are ignored.
 }
 
 func (s *provisionerSuite) TestSeries(c *gc.C) {
@@ -202,6 +340,52 @@ func (s *provisionerSuite) TestSeries(c *gc.C) {
 	series, err = apiMachine.Series()
 	c.Assert(err, gc.IsNil)
 	c.Assert(series, gc.Equals, "quantal")
+}
+
+func (s *provisionerSuite) TestDistributionGroup(c *gc.C) {
+	apiMachine, err := s.provisioner.Machine(s.machine.Tag())
+	c.Assert(err, gc.IsNil)
+	instances, err := apiMachine.DistributionGroup()
+	c.Assert(err, gc.IsNil)
+	c.Assert(instances, gc.DeepEquals, []instance.Id{"i-manager"})
+
+	machine1, err := s.State.AddMachine("quantal", state.JobHostUnits)
+	c.Assert(err, gc.IsNil)
+	apiMachine, err = s.provisioner.Machine(machine1.Tag())
+	c.Assert(err, gc.IsNil)
+	wordpress := s.AddTestingService(c, "wordpress", s.AddTestingCharm(c, "wordpress"))
+
+	err = apiMachine.SetInstanceInfo("i-d", "fake", nil, nil, nil)
+	c.Assert(err, gc.IsNil)
+	instances, err = apiMachine.DistributionGroup()
+	c.Assert(err, gc.IsNil)
+	c.Assert(instances, gc.HasLen, 0) // no units assigned
+
+	var unitNames []string
+	for i := 0; i < 3; i++ {
+		unit, err := wordpress.AddUnit()
+		c.Assert(err, gc.IsNil)
+		unitNames = append(unitNames, unit.Name())
+		err = unit.AssignToMachine(machine1)
+		c.Assert(err, gc.IsNil)
+		instances, err := apiMachine.DistributionGroup()
+		c.Assert(err, gc.IsNil)
+		c.Assert(instances, gc.DeepEquals, []instance.Id{"i-d"})
+	}
+}
+
+func (s *provisionerSuite) TestDistributionGroupMachineNotFound(c *gc.C) {
+	stateMachine, err := s.State.AddMachine("quantal", state.JobHostUnits)
+	c.Assert(err, gc.IsNil)
+	apiMachine, err := s.provisioner.Machine(stateMachine.Tag())
+	c.Assert(err, gc.IsNil)
+	err = apiMachine.EnsureDead()
+	c.Assert(err, gc.IsNil)
+	err = apiMachine.Remove()
+	c.Assert(err, gc.IsNil)
+	_, err = apiMachine.DistributionGroup()
+	c.Assert(err, gc.ErrorMatches, "machine 1 not found")
+	c.Assert(err, jc.Satisfies, params.IsCodeNotFound)
 }
 
 func (s *provisionerSuite) TestConstraints(c *gc.C) {
@@ -228,6 +412,33 @@ func (s *provisionerSuite) TestConstraints(c *gc.C) {
 	c.Assert(cons, gc.DeepEquals, constraints.Value{})
 }
 
+func (s *provisionerSuite) TestRequestedNetworks(c *gc.C) {
+	// Create a fresh machine with some requested networks.
+	template := state.MachineTemplate{
+		Series:          "quantal",
+		Jobs:            []state.MachineJob{state.JobHostUnits},
+		IncludeNetworks: []string{"net1", "net2"},
+		ExcludeNetworks: []string{"net3", "net4"},
+	}
+	netsMachine, err := s.State.AddOneMachine(template)
+	c.Assert(err, gc.IsNil)
+
+	apiMachine, err := s.provisioner.Machine(netsMachine.Tag())
+	c.Assert(err, gc.IsNil)
+	includeNetworks, excludeNetworks, err := apiMachine.RequestedNetworks()
+	c.Assert(err, gc.IsNil)
+	c.Assert(includeNetworks, gc.DeepEquals, template.IncludeNetworks)
+	c.Assert(excludeNetworks, gc.DeepEquals, template.ExcludeNetworks)
+
+	// Now try machine 0.
+	apiMachine, err = s.provisioner.Machine(s.machine.Tag())
+	c.Assert(err, gc.IsNil)
+	includeNetworks, excludeNetworks, err = apiMachine.RequestedNetworks()
+	c.Assert(err, gc.IsNil)
+	c.Assert(includeNetworks, gc.HasLen, 0)
+	c.Assert(excludeNetworks, gc.HasLen, 0)
+}
+
 func (s *provisionerSuite) TestWatchContainers(c *gc.C) {
 	apiMachine, err := s.provisioner.Machine(s.machine.Tag())
 	c.Assert(err, gc.IsNil)
@@ -250,7 +461,7 @@ func (s *provisionerSuite) TestWatchContainers(c *gc.C) {
 
 	// Change something other than the containers and make sure it's
 	// not detected.
-	err = apiMachine.SetStatus(params.StatusStarted, "not really")
+	err = apiMachine.SetStatus(params.StatusStarted, "not really", nil)
 	c.Assert(err, gc.IsNil)
 	wc.AssertNoChange()
 
@@ -325,9 +536,7 @@ func (s *provisionerSuite) TestWatchEnvironMachines(c *gc.C) {
 }
 
 func (s *provisionerSuite) TestStateAddresses(c *gc.C) {
-	err := s.machine.SetAddresses([]instance.Address{
-		instance.NewAddress("0.1.2.3"),
-	})
+	err := s.machine.SetAddresses(instance.NewAddress("0.1.2.3", instance.NetworkUnknown))
 	c.Assert(err, gc.IsNil)
 
 	stateAddresses, err := s.State.Addresses()
@@ -338,32 +547,12 @@ func (s *provisionerSuite) TestStateAddresses(c *gc.C) {
 	c.Assert(addresses, gc.DeepEquals, stateAddresses)
 }
 
-func (s *provisionerSuite) TestAPIAddresses(c *gc.C) {
-	err := s.machine.SetAddresses([]instance.Address{
-		instance.NewAddress("0.1.2.3"),
-	})
-	c.Assert(err, gc.IsNil)
-
-	apiAddresses, err := s.State.APIAddresses()
-	c.Assert(err, gc.IsNil)
-
-	addresses, err := s.provisioner.APIAddresses()
-	c.Assert(err, gc.IsNil)
-	c.Assert(addresses, gc.DeepEquals, apiAddresses)
-}
-
 func (s *provisionerSuite) TestContainerConfig(c *gc.C) {
 	result, err := s.provisioner.ContainerConfig()
 	c.Assert(err, gc.IsNil)
 	c.Assert(result.ProviderType, gc.Equals, "dummy")
 	c.Assert(result.AuthorizedKeys, gc.Equals, coretesting.FakeAuthKeys)
 	c.Assert(result.SSLHostnameVerification, jc.IsTrue)
-}
-
-func (s *provisionerSuite) TestCACert(c *gc.C) {
-	caCert, err := s.provisioner.CACert()
-	c.Assert(err, gc.IsNil)
-	c.Assert(caCert, gc.DeepEquals, s.State.CACert())
 }
 
 func (s *provisionerSuite) TestToolsWrongMachine(c *gc.C) {

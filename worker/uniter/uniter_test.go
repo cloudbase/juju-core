@@ -17,12 +17,14 @@ import (
 	stdtesting "testing"
 	"time"
 
+	jc "github.com/juju/testing/checkers"
 	gc "launchpad.net/gocheck"
 	"launchpad.net/goyaml"
 
 	"launchpad.net/juju-core/agent/tools"
 	"launchpad.net/juju-core/charm"
 	"launchpad.net/juju-core/errors"
+	"launchpad.net/juju-core/instance"
 	"launchpad.net/juju-core/juju/osenv"
 	"launchpad.net/juju-core/juju/testing"
 	"launchpad.net/juju-core/state"
@@ -30,7 +32,7 @@ import (
 	"launchpad.net/juju-core/state/api/params"
 	apiuniter "launchpad.net/juju-core/state/api/uniter"
 	coretesting "launchpad.net/juju-core/testing"
-	jc "launchpad.net/juju-core/testing/checkers"
+	ft "launchpad.net/juju-core/testing/filetesting"
 	"launchpad.net/juju-core/utils"
 	utilexec "launchpad.net/juju-core/utils/exec"
 	"launchpad.net/juju-core/utils/fslock"
@@ -868,7 +870,7 @@ func (s *UniterSuite) TestRunCommand(c *gc.C) {
 			},
 			verifyFile{
 				testFile("jujuc.output"),
-				"user-admin\nprivate.dummy.address.example.com\npublic.dummy.address.example.com\n",
+				"user-admin\nprivate.address.example.com\npublic.address.example.com\n",
 			},
 		), ut(
 			"run commands: proxy settings set",
@@ -965,9 +967,58 @@ var relationsTests = []uniterTest{
 		waitHooks{},
 		// TODO BUG(?): the unit doesn't leave the scope, leaving the relation
 		// unkillable without direct intervention. I'm pretty sure it's not a
-		// uniter bug -- it should be the responisbility of `juju remove-unit
+		// uniter bug -- it should be the responsibility of `juju remove-unit
 		// --force` to cause the unit to leave any relation scopes it may be
 		// in -- but it's worth noting here all the same.
+	), ut(
+		"unknown local relation dir is removed",
+		quickStartRelation{},
+		stopUniter{},
+		custom{func(c *gc.C, ctx *context) {
+			ft.Dir{"state/relations/90210", 0755}.Create(c, ctx.path)
+		}},
+		startUniter{},
+		waitHooks{"config-changed"},
+		custom{func(c *gc.C, ctx *context) {
+			ft.Removed{"state/relations/90210"}.Check(c, ctx.path)
+		}},
+	), ut(
+		"all relations are available to config-changed on bounce, even if state dir is missing",
+		createCharm{
+			customize: func(c *gc.C, ctx *context, path string) {
+				script := "relation-ids db > relations.out && chmod 644 relations.out"
+				appendHook(c, path, "config-changed", script)
+			},
+		},
+		serveCharm{},
+		createUniter{},
+		waitUnit{
+			status: params.StatusStarted,
+		},
+		waitHooks{"install", "config-changed", "start"},
+		addRelation{waitJoin: true},
+		stopUniter{},
+		custom{func(c *gc.C, ctx *context) {
+			// Check the state dir was created, and remove it.
+			path := fmt.Sprintf("state/relations/%d", ctx.relation.Id())
+			ft.Dir{path, 0755}.Check(c, ctx.path)
+			ft.Removed{path}.Create(c, ctx.path)
+
+			// Check that config-changed didn't record any relations, because
+			// they shouldn't been available until after the start hook.
+			ft.File{"charm/relations.out", "", 0644}.Check(c, ctx.path)
+		}},
+		startUniter{},
+		waitHooks{"config-changed"},
+		custom{func(c *gc.C, ctx *context) {
+			// Check the state dir was recreated.
+			path := fmt.Sprintf("state/relations/%d", ctx.relation.Id())
+			ft.Dir{path, 0755}.Check(c, ctx.path)
+
+			// Check that config-changed did record the joined relations.
+			data := fmt.Sprintf("db:%d\n", ctx.relation.Id())
+			ft.File{"charm/relations.out", data, 0644}.Check(c, ctx.path)
+		}},
 	),
 }
 
@@ -1087,6 +1138,28 @@ func (s *UniterSuite) runUniterTests(c *gc.C, uniterTests []uniterTest) {
 	}
 }
 
+// Assign the unit to a provisioned machine with dummy addresses set.
+func assertAssignUnit(c *gc.C, st *state.State, u *state.Unit) {
+	err := u.AssignToNewMachine()
+	c.Assert(err, gc.IsNil)
+	mid, err := u.AssignedMachineId()
+	c.Assert(err, gc.IsNil)
+	machine, err := st.Machine(mid)
+	c.Assert(err, gc.IsNil)
+	err = machine.SetProvisioned("i-exist", "fake_nonce", nil)
+	c.Assert(err, gc.IsNil)
+	err = machine.SetAddresses(instance.Address{
+		Type:         instance.Ipv4Address,
+		NetworkScope: instance.NetworkCloudLocal,
+		Value:        "private.address.example.com",
+	}, instance.Address{
+		Type:         instance.Ipv4Address,
+		NetworkScope: instance.NetworkPublic,
+		Value:        "public.address.example.com",
+	})
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *UniterSuite) TestSubordinateDying(c *gc.C) {
 	// Create a test context for later use.
 	ctx := &context{
@@ -1115,6 +1188,7 @@ func (s *UniterSuite) TestSubordinateDying(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	rel, err := s.State.AddRelation(eps...)
 	c.Assert(err, gc.IsNil)
+	assertAssignUnit(c, s.State, wpu)
 
 	// Create the subordinate unit by entering scope as the principal.
 	wpru, err := rel.Unit(wpu)
@@ -1151,7 +1225,7 @@ func (s ensureStateWorker) step(c *gc.C, ctx *context) {
 	if err != nil || len(addresses) == 0 {
 		testing.AddStateServerMachine(c, ctx.st)
 	}
-	addresses, err = ctx.st.APIAddresses()
+	addresses, err = ctx.st.APIAddressesFromMachines()
 	c.Assert(err, gc.IsNil)
 	c.Assert(addresses, gc.HasLen, 1)
 }
@@ -1231,14 +1305,7 @@ func (csau createServiceAndUnit) step(c *gc.C, ctx *context) {
 	c.Assert(err, gc.IsNil)
 
 	// Assign the unit to a provisioned machine to match expected state.
-	err = unit.AssignToNewMachine()
-	c.Assert(err, gc.IsNil)
-	mid, err := unit.AssignedMachineId()
-	c.Assert(err, gc.IsNil)
-	machine, err := ctx.st.Machine(mid)
-	c.Assert(err, gc.IsNil)
-	err = machine.SetProvisioned("i-exist", "fake_nonce", nil)
-	c.Assert(err, gc.IsNil)
+	assertAssignUnit(c, ctx.st, unit)
 	ctx.svc = svc
 	ctx.unit = unit
 
@@ -1270,11 +1337,11 @@ func (waitAddresses) step(c *gc.C, ctx *context) {
 			// GZ 2013-07-10: Hardcoded values from dummy environ
 			//                special cased here, questionable.
 			private, _ := ctx.unit.PrivateAddress()
-			if private != "private.dummy.address.example.com" {
+			if private != "private.address.example.com" {
 				continue
 			}
 			public, _ := ctx.unit.PublicAddress()
-			if public != "public.dummy.address.example.com" {
+			if public != "public.address.example.com" {
 				continue
 			}
 			return
@@ -1654,7 +1721,7 @@ func (s startUpgradeError) step(c *gc.C, ctx *context) {
 }
 
 type addRelation struct {
-	testing.JujuConnSuite
+	waitJoin bool
 }
 
 func (s addRelation) step(c *gc.C, ctx *context) {
@@ -1669,6 +1736,27 @@ func (s addRelation) step(c *gc.C, ctx *context) {
 	ctx.relation, err = ctx.st.AddRelation(eps...)
 	c.Assert(err, gc.IsNil)
 	ctx.relationUnits = map[string]*state.RelationUnit{}
+	if !s.waitJoin {
+		return
+	}
+
+	// It's hard to do this properly (watching scope) without perturbing other tests.
+	ru, err := ctx.relation.Unit(ctx.unit)
+	c.Assert(err, gc.IsNil)
+	timeout := time.After(worstCase)
+	for {
+		c.Logf("waiting to join relation")
+		select {
+		case <-timeout:
+			c.Fatalf("failed to join relation")
+		case <-time.After(coretesting.ShortWait):
+			inScope, err := ru.InScope()
+			c.Assert(err, gc.IsNil)
+			if inScope {
+				return
+			}
+		}
+	}
 }
 
 type addRelationUnit struct{}
@@ -1721,7 +1809,7 @@ type relationState struct {
 func (s relationState) step(c *gc.C, ctx *context) {
 	err := ctx.relation.Refresh()
 	if s.removed {
-		c.Assert(err, jc.Satisfies, errors.IsNotFoundError)
+		c.Assert(err, jc.Satisfies, errors.IsNotFound)
 		return
 	}
 	c.Assert(err, gc.IsNil)
@@ -1734,7 +1822,7 @@ type addSubordinateRelation struct {
 }
 
 func (s addSubordinateRelation) step(c *gc.C, ctx *context) {
-	if _, err := ctx.st.Service("logging"); errors.IsNotFoundError(err) {
+	if _, err := ctx.st.Service("logging"); errors.IsNotFound(err) {
 		ctx.s.AddTestingService(c, "logging", ctx.s.AddTestingCharm(c, "logging"))
 	}
 	eps, err := ctx.st.InferEndpoints([]string{"logging", "u:" + s.ifce})
@@ -1770,7 +1858,7 @@ func (s waitSubordinateExists) step(c *gc.C, ctx *context) {
 		case <-time.After(coretesting.ShortWait):
 			var err error
 			ctx.subordinate, err = ctx.st.Unit(s.name)
-			if errors.IsNotFoundError(err) {
+			if errors.IsNotFound(err) {
 				continue
 			}
 			c.Assert(err, gc.IsNil)
@@ -1959,16 +2047,13 @@ var verifyHookSyncLockLocked = custom{func(c *gc.C, ctx *context) {
 type setProxySettings osenv.ProxySettings
 
 func (s setProxySettings) step(c *gc.C, ctx *context) {
-	old, err := ctx.st.EnvironConfig()
-	c.Assert(err, gc.IsNil)
-	cfg, err := old.Apply(map[string]interface{}{
+	attrs := map[string]interface{}{
 		"http-proxy":  s.Http,
 		"https-proxy": s.Https,
 		"ftp-proxy":   s.Ftp,
 		"no-proxy":    s.NoProxy,
-	})
-	c.Assert(err, gc.IsNil)
-	err = ctx.st.SetEnvironConfig(cfg, old)
+	}
+	err := ctx.st.UpdateEnvironConfig(attrs, nil, nil)
 	c.Assert(err, gc.IsNil)
 	// wait for the new values...
 	expected := (osenv.ProxySettings)(s)

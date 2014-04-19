@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path"
 	"reflect"
@@ -26,6 +25,7 @@ import (
 	"github.com/juju/loggo"
 
 	"launchpad.net/juju-core/errors"
+	"launchpad.net/juju-core/utils"
 )
 
 var logger = loggo.GetLogger("juju.environs.simplestreams")
@@ -379,16 +379,6 @@ func (entries IndexMetadataSlice) filter(match func(*IndexMetadata) bool) IndexM
 	return result
 }
 
-func init() {
-	RegisterProtocol("file", http.NewFileTransport(http.Dir("/")))
-}
-
-// RegisterProtocol registers a new protocol with the simplestreams http client.
-// Exported for testing.
-func RegisterProtocol(scheme string, rt http.RoundTripper) {
-	http.DefaultTransport.(*http.Transport).RegisterProtocol(scheme, rt)
-}
-
 // noMatchingProductsError is used to indicate that metadata files have been located,
 // but there is no metadata satisfying a product criteria.
 // It is used to distinguish from the situation where the metadata files could not be found.
@@ -474,7 +464,7 @@ func getMaybeSignedMetadata(source DataSource, baseIndexPath string, cons Lookup
 	resolveInfo.IndexURL = indexURL
 	indexRef, err := GetIndexWithFormat(source, indexPath, "index:1.0", signed, cons.Params().CloudSpec, params)
 	if err != nil {
-		if errors.IsNotFoundError(err) || errors.IsUnauthorizedError(err) {
+		if errors.IsNotFound(err) || errors.IsUnauthorized(err) {
 			logger.Debugf("cannot load index %q: %v", indexURL, err)
 		}
 		return nil, resolveInfo, err
@@ -482,7 +472,7 @@ func getMaybeSignedMetadata(source DataSource, baseIndexPath string, cons Lookup
 	logger.Debugf("read metadata index at %q", indexURL)
 	items, err = indexRef.getLatestMetadataWithFormat(cons, "products:1.0", signed)
 	if err != nil {
-		if errors.IsNotFoundError(err) {
+		if errors.IsNotFound(err) {
 			logger.Debugf("skipping index because of error getting latest metadata %q: %v", indexURL, err)
 			return nil, resolveInfo, err
 		}
@@ -523,7 +513,7 @@ func GetIndexWithFormat(source DataSource, indexPath, indexFormat string, requir
 
 	data, url, err := fetchData(source, indexPath, requireSigned, params.PublicKey)
 	if err != nil {
-		if errors.IsNotFoundError(err) || errors.IsUnauthorizedError(err) {
+		if errors.IsNotFound(err) || errors.IsUnauthorized(err) {
 			return nil, err
 		}
 		return nil, fmt.Errorf("cannot read index data, %v", err)
@@ -540,7 +530,7 @@ func GetIndexWithFormat(source DataSource, indexPath, indexFormat string, requir
 	}
 
 	mirrors, url, err := getMirrorRefs(source, mirrorsPath, requireSigned, params)
-	if err != nil && !errors.IsNotFoundError(err) && !errors.IsUnauthorizedError(err) {
+	if err != nil && !errors.IsNotFound(err) && !errors.IsUnauthorized(err) {
 		return nil, fmt.Errorf("cannot load mirror metadata at URL %q: %v", url, err)
 	}
 
@@ -556,7 +546,7 @@ func GetIndexWithFormat(source DataSource, indexPath, indexFormat string, requir
 			source, mirrors, params.DataType, params.MirrorContentId, cloudSpec, requireSigned, params.PublicKey)
 		if err == nil {
 			logger.Debugf("using mirrored products path: %s", path.Join(mirrorInfo.MirrorURL, mirrorInfo.Path))
-			indexRef.Source = NewURLDataSource("mirror", mirrorInfo.MirrorURL, VerifySSLHostnames)
+			indexRef.Source = NewURLDataSource("mirror", mirrorInfo.MirrorURL, utils.VerifySSLHostnames)
 			indexRef.MirroredProductsPath = mirrorInfo.Path
 		} else {
 			logger.Debugf("no mirror information available for %s: %v", cloudSpec, err)
@@ -577,7 +567,7 @@ func getMirrorRefs(source DataSource, baseMirrorsPath string, requireSigned bool
 	var mirrors MirrorRefs
 	data, url, err := fetchData(source, mirrorsPath, requireSigned, params.PublicKey)
 	if err != nil {
-		if errors.IsNotFoundError(err) || errors.IsUnauthorizedError(err) {
+		if errors.IsNotFound(err) || errors.IsUnauthorized(err) {
 			logger.Debugf("no mirror index file found")
 			return mirrors, url, err
 		}
@@ -723,7 +713,7 @@ func GetMirrorMetadataWithFormat(source DataSource, mirrorPath, format string,
 
 	data, url, err := fetchData(source, mirrorPath, requireSigned, publicKey)
 	if err != nil {
-		if errors.IsNotFoundError(err) || errors.IsUnauthorizedError(err) {
+		if errors.IsNotFound(err) || errors.IsUnauthorized(err) {
 			return nil, err
 		}
 		return nil, fmt.Errorf("cannot read mirror data, %v", err)

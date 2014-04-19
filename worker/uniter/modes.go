@@ -11,7 +11,6 @@ import (
 
 	"launchpad.net/juju-core/charm"
 	"launchpad.net/juju-core/charm/hooks"
-	"launchpad.net/juju-core/environs"
 	"launchpad.net/juju-core/state/api/params"
 	"launchpad.net/juju-core/state/watcher"
 	"launchpad.net/juju-core/worker"
@@ -22,41 +21,6 @@ import (
 // Mode defines the signature of the functions that implement the possible
 // states of a running Uniter.
 type Mode func(u *Uniter) (Mode, error)
-
-// ModeInit is the initial Uniter mode.
-func ModeInit(u *Uniter) (next Mode, err error) {
-	defer modeContext("ModeInit", &err)()
-	logger.Infof("updating unit addresses")
-	// TODO(dimitern): We might be able to drop all this address stuff
-	// entirely once we have machine addresses.
-	providerType, err := u.st.ProviderType()
-	if err != nil {
-		return nil, err
-	}
-	provider, err := environs.Provider(providerType)
-	if err != nil {
-		return nil, err
-	}
-	if private, err := provider.PrivateAddress(); err != nil {
-		logger.Errorf("cannot get unit's private address: %v", err)
-		return nil, err
-	} else if err = u.unit.SetPrivateAddress(private); err != nil {
-		logger.Errorf("cannot set unit's private address: %v", err)
-		return nil, err
-	}
-	if public, err := provider.PublicAddress(); err != nil {
-		logger.Errorf("cannot get unit's public address: %v", err)
-		return nil, err
-	} else if err = u.unit.SetPublicAddress(public); err != nil {
-		logger.Errorf("cannot set unit's public address: %v", err)
-		return nil, err
-	}
-	logger.Infof("reconciling relation state")
-	if err := u.restoreRelations(); err != nil {
-		return nil, err
-	}
-	return ModeContinue, nil
-}
 
 // ModeContinue determines what action to take based on persistent uniter state.
 func ModeContinue(u *Uniter) (next Mode, err error) {

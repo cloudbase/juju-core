@@ -179,10 +179,8 @@ func (cfg *Config) AddRunCmd(cmd string) {
 	cfg.addCmd("runcmd", &command{literal: cmd})
 }
 
-// AddPSCmd adds a command to be executed
-// at first boot. The command will be run
-// by the shell with any metacharacters retaining
-// their special meaning (that is, no quoting takes place).
+// AddPSCmd adds a powershell command to be executed
+// at first boot by cloudbase-init
 func (cfg *Config) AddPSCmd(cmd string) {
 	cmdLine := fmt.Sprintf("%s\r\n", cmd)
 	cfg.addCmd("powershell", &command{literal: cmdLine})

@@ -19,17 +19,18 @@ import (
 	stdtesting "testing"
 	"time"
 
+	"github.com/juju/loggo"
 	"labix.org/v2/mgo"
 	gc "launchpad.net/gocheck"
 
 	"launchpad.net/juju-core/cert"
-	"launchpad.net/juju-core/log"
 	"launchpad.net/juju-core/utils"
 )
 
 var (
 	// MgoServer is a shared mongo server used by tests.
 	MgoServer = &MgoInstance{ssl: true}
+	logger    = loggo.GetLogger("juju.testing")
 )
 
 type MgoInstance struct {
@@ -83,6 +84,7 @@ func (inst *MgoInstance) Start(ssl bool) error {
 	if err != nil {
 		return err
 	}
+	logger.Debugf("starting mongo in %s", dbdir)
 
 	// give them all the same keyfile so they can talk appropriately
 	keyFilePath := filepath.Join(dbdir, "keyfile")
@@ -105,8 +107,10 @@ func (inst *MgoInstance) Start(ssl bool) error {
 		inst.port = 0
 		os.RemoveAll(inst.dir)
 		inst.dir = ""
+		return err
 	}
-	return err
+	logger.Debugf("started mongod pid %d in %s on port %d", inst.server.Process.Pid, dbdir, inst.port)
+	return nil
 }
 
 // run runs the MongoDB server at the
@@ -148,14 +152,15 @@ func (inst *MgoInstance) run() error {
 	started := make(chan struct{})
 	go func() {
 		<-started
-		lines := readLines(out, 20)
+		lines := readLines(fmt.Sprintf("mongod:%v", mgoport), out, 20)
 		err := server.Wait()
 		exitErr, _ := err.(*exec.ExitError)
 		if err == nil || exitErr != nil && exitErr.Exited() {
 			// mongodb has exited without being killed, so print the
 			// last few lines of its log output.
+			logger.Errorf("mongodb has exited without being killed")
 			for _, line := range lines {
-				log.Infof("mongod: %s", line)
+				logger.Errorf("mongod: %s", line)
 			}
 		}
 		close(exited)
@@ -180,6 +185,7 @@ func (inst *MgoInstance) kill() {
 
 func (inst *MgoInstance) Destroy() {
 	if inst.server != nil {
+		logger.Debugf("killing mongod pid %d in %s on port %d", inst.server.Process.Pid, inst.dir, inst.port)
 		inst.kill()
 		os.RemoveAll(inst.dir)
 		inst.addr, inst.dir = "", ""
@@ -189,6 +195,7 @@ func (inst *MgoInstance) Destroy() {
 // Restart restarts the mongo server, useful for
 // testing what happens when a state server goes down.
 func (inst *MgoInstance) Restart() {
+	logger.Debugf("restarting mongod pid %d in %s on port %d", inst.server.Process.Pid, inst.dir, inst.port)
 	inst.kill()
 	if err := inst.Start(inst.ssl); err != nil {
 		panic(err)
@@ -220,13 +227,14 @@ func (s *MgoSuite) SetUpSuite(c *gc.C) {
 
 // readLines reads lines from the given reader and returns
 // the last n non-empty lines, ignoring empty lines.
-func readLines(r io.Reader, n int) []string {
+func readLines(prefix string, r io.Reader, n int) []string {
 	br := bufio.NewReader(r)
 	lines := make([]string, n)
 	i := 0
 	for {
 		line, err := br.ReadString('\n')
 		if line = strings.TrimRight(line, "\n"); line != "" {
+			logger.Tracef("%s: %s", prefix, line)
 			lines[i%n] = line
 			i++
 		}
@@ -253,7 +261,7 @@ func (s *MgoSuite) TearDownSuite(c *gc.C) {
 // MustDial returns a new connection to the MongoDB server, and panics on
 // errors.
 func (inst *MgoInstance) MustDial() *mgo.Session {
-	s, err := inst.dial(false)
+	s, err := mgo.DialWithInfo(inst.DialInfo())
 	if err != nil {
 		panic(err)
 	}
@@ -262,45 +270,59 @@ func (inst *MgoInstance) MustDial() *mgo.Session {
 
 // Dial returns a new connection to the MongoDB server.
 func (inst *MgoInstance) Dial() (*mgo.Session, error) {
-	return inst.dial(false)
+	return mgo.DialWithInfo(inst.DialInfo())
+}
+
+// DialInfo returns information suitable for dialling the
+// receiving MongoDB instance.
+func (inst *MgoInstance) DialInfo() *mgo.DialInfo {
+	return MgoDialInfo(inst.addr)
 }
 
 // DialDirect returns a new direct connection to the shared MongoDB server. This
 // must be used if you're connecting to a replicaset that hasn't been initiated
 // yet.
 func (inst *MgoInstance) DialDirect() (*mgo.Session, error) {
-	return inst.dial(true)
+	info := inst.DialInfo()
+	info.Direct = true
+	return mgo.DialWithInfo(info)
 }
 
 // MustDialDirect works like DialDirect, but panics on errors.
 func (inst *MgoInstance) MustDialDirect() *mgo.Session {
-	session, err := inst.dial(true)
+	session, err := inst.DialDirect()
 	if err != nil {
 		panic(err)
 	}
 	return session
 }
 
-func (inst *MgoInstance) dial(direct bool) (*mgo.Session, error) {
+// MgoDialInfo returns a DialInfo suitable
+// for dialling an MgoInstance at any of the
+// given addresses.
+func MgoDialInfo(addrs ...string) *mgo.DialInfo {
 	pool := x509.NewCertPool()
-	xcert, err := cert.ParseCert([]byte(CACert))
+	xcert, err := cert.ParseCert(CACert)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	pool.AddCert(xcert)
 	tlsConfig := &tls.Config{
 		RootCAs:    pool,
 		ServerName: "anything",
 	}
-	session, err := mgo.DialWithInfo(&mgo.DialInfo{
-		Direct: direct,
-		Addrs:  []string{inst.addr},
+	return &mgo.DialInfo{
+		Addrs: addrs,
 		Dial: func(addr net.Addr) (net.Conn, error) {
-			return tls.Dial("tcp", addr.String(), tlsConfig)
+			conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
+			if err != nil {
+				logger.Debugf("tls.Dial(%s) failed with %v", addr, err)
+				return nil, err
+			}
+			return conn, nil
 		},
 		Timeout: mgoDialTimeout,
-	})
-	return session, err
+	}
 }
 
 func (s *MgoSuite) SetUpTest(c *gc.C) {
@@ -311,29 +333,37 @@ func (s *MgoSuite) SetUpTest(c *gc.C) {
 // Reset deletes all content from the MongoDB server and panics if it encounters
 // errors.
 func (inst *MgoInstance) Reset() {
+	// If the server has already been destroyed for testing purposes,
+	// just start it again.
+	if inst.Addr() == "" {
+		if err := inst.Start(inst.ssl); err != nil {
+			panic(err)
+		}
+		return
+	}
 	session := inst.MustDial()
 	defer session.Close()
 
 	dbnames, ok := resetAdminPasswordAndFetchDBNames(session)
-	if ok {
-		log.Infof("Reset successfully reset admin password")
-	} else {
+	if !ok {
 		// We restart it to regain access.  This should only
 		// happen when tests fail.
-		log.Noticef("testing: restarting MongoDB server after unauthorized access")
+		logger.Infof("restarting MongoDB server after unauthorized access")
 		inst.Destroy()
 		if err := inst.Start(inst.ssl); err != nil {
 			panic(err)
 		}
 		return
 	}
+	logger.Infof("reset successfully reset admin password")
 	for _, name := range dbnames {
 		switch name {
-		case "admin", "local", "config":
-		default:
-			if err := session.DB(name).DropDatabase(); err != nil {
-				panic(fmt.Errorf("Cannot drop MongoDB database %v: %v", name, err))
-			}
+		case "local", "config":
+			// don't delete these
+			continue
+		}
+		if err := session.DB(name).DropDatabase(); err != nil {
+			panic(fmt.Errorf("Cannot drop MongoDB database %v: %v", name, err))
 		}
 	}
 }
@@ -360,7 +390,7 @@ func resetAdminPasswordAndFetchDBNames(session *mgo.Session) ([]string, bool) {
 	} {
 		admin := session.DB("admin")
 		if err := admin.Login("admin", password); err != nil {
-			log.Infof("failed to log in with password %q", password)
+			logger.Infof("failed to log in with password %q", password)
 			continue
 		}
 		dbnames, err := session.DatabaseNames()
@@ -373,7 +403,7 @@ func resetAdminPasswordAndFetchDBNames(session *mgo.Session) ([]string, bool) {
 		if !isUnauthorized(err) {
 			panic(err)
 		}
-		log.Infof("unauthorized access when getting database names; password %q", password)
+		logger.Infof("unauthorized access when getting database names; password %q", password)
 	}
 	return nil, false
 }

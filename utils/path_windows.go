@@ -1,3 +1,6 @@
+/*
+Go does not have Symlink support, hence, this module
+*/
 package utils
 
 import (

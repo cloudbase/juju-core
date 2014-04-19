@@ -85,7 +85,7 @@ func (st *State) cleanupSettings(prefix string) error {
 	// Documents marked for cleanup are not otherwise referenced in the
 	// system, and will not be under watch, and are therefore safe to
 	// delete directly.
-	sel := D{{"_id", D{{"$regex", "^" + prefix}}}}
+	sel := bson.D{{"_id", bson.D{{"$regex", "^" + prefix}}}}
 	if count, err := st.settings.Find(sel).Count(); err != nil {
 		return fmt.Errorf("cannot detect cleanup targets: %v", err)
 	} else if count != 0 {
@@ -103,7 +103,7 @@ func (st *State) cleanupServices() error {
 	// services added to it. But we do have to remove the services themselves
 	// via individual transactions, because they could be in any state at all.
 	service := &Service{st: st}
-	sel := D{{"life", Alive}}
+	sel := bson.D{{"life", Alive}}
 	iter := st.services.Find(sel).Iter()
 	for iter.Next(&service.doc) {
 		if err := service.Destroy(); err != nil {
@@ -123,7 +123,7 @@ func (st *State) cleanupUnits(prefix string) error {
 	// to it. But we do have to remove the units themselves via individual
 	// transactions, because they could be in any state at all.
 	unit := &Unit{st: st}
-	sel := D{{"_id", D{{"$regex", "^" + prefix}}}, {"life", Alive}}
+	sel := bson.D{{"_id", bson.D{{"$regex", "^" + prefix}}}, {"life", Alive}}
 	iter := st.units.Find(sel).Iter()
 	for iter.Next(&unit.doc) {
 		if err := unit.Destroy(); err != nil {
@@ -141,7 +141,7 @@ func (st *State) cleanupUnits(prefix string) error {
 // expected to be used in response to destroy-machine --force.
 func (st *State) cleanupMachine(machineId string) error {
 	machine, err := st.Machine(machineId)
-	if errors.IsNotFoundError(err) {
+	if errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
@@ -162,7 +162,7 @@ func (st *State) cleanupMachine(machineId string) error {
 	// We need to refresh the machine at this point, because the local copy
 	// of the document will not reflect changes caused by the unit cleanups
 	// above, and may thus fail immediately.
-	if err := machine.Refresh(); errors.IsNotFoundError(err) {
+	if err := machine.Refresh(); errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
@@ -184,7 +184,7 @@ func (st *State) cleanupMachine(machineId string) error {
 // machine's containers, and removes them from state entirely.
 func (st *State) cleanupContainers(machine *Machine) error {
 	containerIds, err := machine.Containers()
-	if errors.IsNotFoundError(err) {
+	if errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
@@ -194,7 +194,7 @@ func (st *State) cleanupContainers(machine *Machine) error {
 			return err
 		}
 		container, err := st.Machine(containerId)
-		if errors.IsNotFoundError(err) {
+		if errors.IsNotFound(err) {
 			return nil
 		} else if err != nil {
 			return err
@@ -212,7 +212,7 @@ func (st *State) cleanupContainers(machine *Machine) error {
 // shutdown of units is not going to leave a machine in a difficult state.
 func (st *State) obliterateUnit(unitName string) error {
 	unit, err := st.Unit(unitName)
-	if errors.IsNotFoundError(err) {
+	if errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
@@ -223,7 +223,7 @@ func (st *State) obliterateUnit(unitName string) error {
 	if err := unit.Destroy(); err != nil {
 		return err
 	}
-	if err := unit.Refresh(); errors.IsNotFoundError(err) {
+	if err := unit.Refresh(); errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err

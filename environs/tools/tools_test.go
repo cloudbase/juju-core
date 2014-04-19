@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/juju/loggo"
+	jc "github.com/juju/testing/checkers"
 	gc "launchpad.net/gocheck"
 
 	"launchpad.net/juju-core/environs"
@@ -20,7 +21,6 @@ import (
 	"launchpad.net/juju-core/errors"
 	"launchpad.net/juju-core/provider/dummy"
 	"launchpad.net/juju-core/testing"
-	jc "launchpad.net/juju-core/testing/checkers"
 	"launchpad.net/juju-core/testing/testbase"
 	coretools "launchpad.net/juju-core/tools"
 	"launchpad.net/juju-core/version"
@@ -163,7 +163,7 @@ func (s *SimpleStreamsToolsSuite) TestFindTools(c *gc.C) {
 			if len(actual) > 0 {
 				c.Logf(actual.String())
 			}
-			c.Check(err, jc.Satisfies, errors.IsNotFoundError)
+			c.Check(err, jc.Satisfies, errors.IsNotFound)
 			continue
 		}
 		expect := map[version.Binary]string{}
@@ -197,7 +197,7 @@ func (s *SimpleStreamsToolsSuite) TestFindToolsFiltering(c *gc.C) {
 	defer loggo.RemoveWriter("filter-tester")
 	_, err := envtools.FindTools(
 		s.env, 1, -1, coretools.Filter{Number: version.Number{Major: 1, Minor: 2, Patch: 3}}, envtools.DoNotAllowRetry)
-	c.Assert(err, jc.Satisfies, errors.IsNotFoundError)
+	c.Assert(err, jc.Satisfies, errors.IsNotFound)
 	// This is slightly overly prescriptive, but feel free to change or add
 	// messages. This still helps to ensure that all log messages are
 	// properly formed.
@@ -240,11 +240,11 @@ func (s *SimpleStreamsToolsSuite) TestFindBootstrapTools(c *gc.C) {
 			Arch:    &test.Arch,
 		}
 		actual, err := envtools.FindBootstrapTools(s.env, params)
-		if test.Err != nil {
+		if test.Err != "" {
 			if len(actual) > 0 {
 				c.Logf(actual.String())
 			}
-			c.Check(err, jc.Satisfies, errors.IsNotFoundError)
+			c.Check(err, jc.Satisfies, errors.IsNotFound)
 			continue
 		}
 		expect := map[version.Binary]string{}
@@ -328,7 +328,7 @@ func (s *SimpleStreamsToolsSuite) TestFindInstanceTools(c *gc.C) {
 			if len(actual) > 0 {
 				c.Logf(actual.String())
 			}
-			c.Check(err, jc.Satisfies, errors.IsNotFoundError)
+			c.Check(err, jc.Satisfies, errors.IsNotFound)
 			continue
 		}
 		expect := map[version.Binary]string{}
@@ -392,7 +392,7 @@ func (s *SimpleStreamsToolsSuite) TestFindExactTools(c *gc.C) {
 				c.Check(actual.URL, gc.DeepEquals, public[actual.Version])
 			}
 		} else {
-			c.Check(err, jc.Satisfies, errors.IsNotFoundError)
+			c.Check(err, jc.Satisfies, errors.IsNotFound)
 		}
 	}
 }

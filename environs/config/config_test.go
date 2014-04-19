@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
+	jc "github.com/juju/testing/checkers"
 	gc "launchpad.net/gocheck"
 
 	"launchpad.net/juju-core/cert"
@@ -17,7 +18,6 @@ import (
 	"launchpad.net/juju-core/juju/osenv"
 	"launchpad.net/juju-core/schema"
 	"launchpad.net/juju-core/testing"
-	jc "launchpad.net/juju-core/testing/checkers"
 	"launchpad.net/juju-core/testing/testbase"
 	"launchpad.net/juju-core/version"
 )
@@ -652,7 +652,6 @@ var configTests = []configTest{
 	authTokenConfigTest("token=value, =z", false),
 	authTokenConfigTest("token=value =z", false),
 	authTokenConfigTest("\t", false),
-	missingAttributeNoDefault("default-series"),
 	missingAttributeNoDefault("firewall-mode"),
 	missingAttributeNoDefault("development"),
 	missingAttributeNoDefault("ssl-hostname-verification"),
@@ -861,11 +860,14 @@ func (test configTest) check(c *gc.C, home *testing.FakeHome) {
 	testmode, _ := test.attrs["test-mode"].(bool)
 	c.Assert(cfg.TestMode(), gc.Equals, testmode)
 
-	if series, _ := test.attrs["default-series"].(string); series != "" {
-		c.Assert(cfg.DefaultSeries(), gc.Equals, series)
+	series, _ := test.attrs["default-series"].(string)
+	if defaultSeries, ok := cfg.DefaultSeries(); ok {
+		c.Assert(defaultSeries, gc.Equals, series)
 	} else {
-		c.Assert(cfg.DefaultSeries(), gc.Equals, config.DefaultSeries)
+		c.Assert(series, gc.Equals, "")
+		c.Assert(defaultSeries, gc.Equals, "")
 	}
+
 	if m, _ := test.attrs["firewall-mode"].(string); m != "" {
 		c.Assert(cfg.FirewallMode(), gc.Equals, m)
 	}
@@ -1010,7 +1012,7 @@ func (s *ConfigSuite) TestConfigAttrs(c *gc.C) {
 		"bootstrap-timeout":         3600,
 		"bootstrap-retry-delay":     30,
 		"bootstrap-addresses-delay": 10,
-		"default-series":            "precise",
+		"default-series":            testing.FakeDefaultSeries,
 		"charm-store-auth":          "token=auth",
 		"test-mode":                 false,
 	}
@@ -1019,20 +1021,13 @@ func (s *ConfigSuite) TestConfigAttrs(c *gc.C) {
 
 	// These attributes are added if not set.
 	attrs["development"] = false
-	attrs["default-series"] = config.DefaultSeries
 	attrs["logging-config"] = "<root>=WARNING;unit=DEBUG"
 	attrs["ca-private-key"] = ""
 	attrs["image-metadata-url"] = ""
 	attrs["tools-metadata-url"] = ""
 	attrs["tools-url"] = ""
 	attrs["image-stream"] = ""
-	attrs["http-proxy"] = ""
-	attrs["https-proxy"] = ""
-	attrs["ftp-proxy"] = ""
-	attrs["no-proxy"] = ""
-	attrs["apt-http-proxy"] = ""
-	attrs["apt-https-proxy"] = ""
-	attrs["apt-ftp-proxy"] = ""
+	attrs["proxy-ssh"] = false
 
 	// Default firewall mode is instance
 	attrs["firewall-mode"] = string(config.FwInstance)
@@ -1346,16 +1341,16 @@ func (*ConfigSuite) TestGenerateStateServerCertAndKey(c *gc.C) {
 			_, _, err = cert.ParseCertAndKey(certPEM, keyPEM)
 			c.Check(err, gc.IsNil)
 
-			err = cert.Verify(certPEM, []byte(testing.CACert), time.Now())
+			err = cert.Verify(certPEM, testing.CACert, time.Now())
 			c.Assert(err, gc.IsNil)
-			err = cert.Verify(certPEM, []byte(testing.CACert), time.Now().AddDate(9, 0, 0))
+			err = cert.Verify(certPEM, testing.CACert, time.Now().AddDate(9, 0, 0))
 			c.Assert(err, gc.IsNil)
-			err = cert.Verify(certPEM, []byte(testing.CACert), time.Now().AddDate(10, 0, 1))
+			err = cert.Verify(certPEM, testing.CACert, time.Now().AddDate(10, 0, 1))
 			c.Assert(err, gc.NotNil)
 		} else {
 			c.Assert(err, gc.ErrorMatches, test.errMatch)
-			c.Assert(certPEM, gc.IsNil)
-			c.Assert(keyPEM, gc.IsNil)
+			c.Assert(certPEM, gc.Equals, "")
+			c.Assert(keyPEM, gc.Equals, "")
 		}
 	}
 }

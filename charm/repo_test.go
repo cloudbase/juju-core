@@ -16,7 +16,7 @@ import (
 	env_config "launchpad.net/juju-core/environs/config"
 	"launchpad.net/juju-core/testing"
 	"launchpad.net/juju-core/testing/testbase"
-    "launchpad.net/juju-core/utils"
+	"launchpad.net/juju-core/utils"
 )
 
 type StoreSuite struct {
@@ -76,7 +76,7 @@ func (s *StoreSuite) TestError(c *gc.C) {
 
 func (s *StoreSuite) TestWarning(c *gc.C) {
 	charmURL := charm.MustParseURL("cs:series/unwise")
-	expect := `.* WARNING juju charm store reports for "cs:series/unwise": foolishness` + "\n"
+	expect := `.* WARNING juju.charm charm store reports for "cs:series/unwise": foolishness` + "\n"
 	r, err := charm.Latest(s.store, charmURL)
 	c.Assert(r, gc.Equals, 23)
 	c.Assert(err, gc.IsNil)
@@ -174,7 +174,7 @@ func (s *StoreSuite) TestGetTestModeFlag(c *gc.C) {
 // The following tests cover the low-level CharmStore-specific API.
 
 func (s *StoreSuite) TestInfo(c *gc.C) {
-	charmURLs := []*charm.URL{
+	charmURLs := []charm.Location{
 		charm.MustParseURL("cs:series/good"),
 		charm.MustParseURL("cs:series/better"),
 		charm.MustParseURL("cs:series/best"),
@@ -234,7 +234,7 @@ func (s *StoreSuite) TestInfoDNSError(c *gc.C) {
 	charmURL := charm.MustParseURL("cs:series/good")
 	resp, err := store.Info(charmURL)
 	c.Assert(resp, gc.IsNil)
-	expect := `Cannot access the charm store. Are you connected to the internet. Error details:.*`
+	expect := `Cannot access the charm store. .*`
 	c.Assert(err, gc.ErrorMatches, expect)
 }
 
@@ -388,7 +388,7 @@ var _ = gc.Suite(&LocalRepoSuite{})
 func (s *LocalRepoSuite) SetUpTest(c *gc.C) {
 	s.LoggingSuite.SetUpTest(c)
 	root := c.MkDir()
-	s.repo = &charm.LocalRepository{root}
+	s.repo = &charm.LocalRepository{Path: root}
 	s.seriesPath = filepath.Join(root, "quantal")
 	c.Assert(os.Mkdir(s.seriesPath, 0777), gc.IsNil)
 }
@@ -494,9 +494,9 @@ func (s *LocalRepoSuite) TestLogsErrors(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(ch.Revision(), gc.Equals, 1)
 	c.Assert(c.GetTestLog(), gc.Matches, `
-.* WARNING juju failed to load charm at ".*/quantal/blah": .*
-.* WARNING juju failed to load charm at ".*/quantal/blah.charm": .*
-.* WARNING juju failed to load charm at ".*/quantal/upgrade2": .*
+.* WARNING juju.charm failed to load charm at ".*/quantal/blah": .*
+.* WARNING juju.charm failed to load charm at ".*/quantal/blah.charm": .*
+.* WARNING juju.charm failed to load charm at ".*/quantal/upgrade2": .*
 `[1:])
 }
 

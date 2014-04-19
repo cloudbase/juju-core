@@ -14,6 +14,7 @@ import (
 	"strings"
 	stdtesting "testing"
 
+	jc "github.com/juju/testing/checkers"
 	"launchpad.net/gnuflag"
 	gc "launchpad.net/gocheck"
 
@@ -223,6 +224,7 @@ var commandNames = []string{
 	"destroy-relation",
 	"destroy-service",
 	"destroy-unit",
+	"ensure-availability",
 	"env", // alias for switch
 	"expose",
 	"generate-config", // alias for init
@@ -239,6 +241,7 @@ var commandNames = []string{
 	"remove-service",  // alias for destroy-service
 	"remove-unit",     // alias for destroy-unit
 	"resolved",
+	"retry-provisioning",
 	"run",
 	"scp",
 	"set",
@@ -253,6 +256,8 @@ var commandNames = []string{
 	"terminate-machine", // alias for destroy-machine
 	"unexpose",
 	"unset",
+	"unset-env", // alias for unset-environment
+	"unset-environment",
 	"upgrade-charm",
 	"upgrade-juju",
 	"version",
@@ -273,7 +278,7 @@ func (s *MainSuite) TestHelpCommands(c *gc.C) {
 		names = append(names, f[0])
 	}
 	// The names should be output in alphabetical order, so don't sort.
-	c.Assert(names, gc.DeepEquals, commandNames)
+	c.Assert(names, jc.DeepEquals, commandNames)
 }
 
 var topicNames = []string{
@@ -316,6 +321,7 @@ var globalFlags = []string{
 	"-h, --help .*",
 	"--log-file .*",
 	"--logging-config .*",
+	"-q, --quiet .*",
 	"--show-log .*",
 	"-v, --verbose .*",
 }

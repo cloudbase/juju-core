@@ -8,6 +8,7 @@ import (
 	stdtesting "testing"
 	"time"
 
+	jc "github.com/juju/testing/checkers"
 	gc "launchpad.net/gocheck"
 
 	"launchpad.net/juju-core/constraints"
@@ -20,7 +21,6 @@ import (
 	"launchpad.net/juju-core/state/api"
 	"launchpad.net/juju-core/state/api/params"
 	coretesting "launchpad.net/juju-core/testing"
-	jc "launchpad.net/juju-core/testing/checkers"
 )
 
 func TestAll(t *stdtesting.T) {
@@ -77,7 +77,7 @@ func removeServiceAndUnits(c *gc.C, service *state.Service) {
 	c.Assert(err, gc.IsNil)
 
 	err = service.Refresh()
-	c.Assert(err, jc.Satisfies, errors.IsNotFoundError)
+	c.Assert(err, jc.Satisfies, errors.IsNotFound)
 }
 
 // apiAuthenticator represents a simple authenticator object with only the
@@ -154,6 +154,9 @@ var scenarioStatus = &api.Status{
 			AgentStateInfo: "(started)",
 			Series:         "quantal",
 			Containers:     map[string]api.MachineStatus{},
+			Jobs:           []params.MachineJob{params.JobManageEnviron},
+			HasVote:        false,
+			WantsVote:      true,
 		},
 		"1": {
 			Id:             "1",
@@ -162,6 +165,9 @@ var scenarioStatus = &api.Status{
 			AgentStateInfo: "(started)",
 			Series:         "quantal",
 			Containers:     map[string]api.MachineStatus{},
+			Jobs:           []params.MachineJob{params.JobHostUnits},
+			HasVote:        false,
+			WantsVote:      false,
 		},
 		"2": {
 			Id:             "2",
@@ -170,6 +176,9 @@ var scenarioStatus = &api.Status{
 			AgentStateInfo: "(started)",
 			Series:         "quantal",
 			Containers:     map[string]api.MachineStatus{},
+			Jobs:           []params.MachineJob{params.JobHostUnits},
+			HasVote:        false,
+			WantsVote:      false,
 		},
 	},
 	Services: map[string]api.ServiceStatus{
@@ -262,12 +271,12 @@ func (s *baseSuite) setUpScenario(c *gc.C) (entities []string) {
 	add := func(e state.Entity) {
 		entities = append(entities, e.Tag())
 	}
-	u, err := s.State.User("admin")
+	u, err := s.State.User(state.AdminUser)
 	c.Assert(err, gc.IsNil)
 	setDefaultPassword(c, u)
 	add(u)
 
-	u, err = s.State.AddUser("other", "")
+	u, err = s.State.AddUser("other", "password")
 	c.Assert(err, gc.IsNil)
 	setDefaultPassword(c, u)
 	add(u)

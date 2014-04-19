@@ -38,7 +38,7 @@ func readMetadata(metadataStore storage.Storage) ([]*ImageMetadata, error) {
 	imageConstraint := NewImageConstraint(simplestreams.LookupParams{})
 	existingMetadata, _, err := Fetch(
 		[]simplestreams.DataSource{dataSource}, simplestreams.DefaultIndexPath, imageConstraint, false)
-	if err != nil && !errors.IsNotFoundError(err) {
+	if err != nil && !errors.IsNotFound(err) {
 		return nil, err
 	}
 	return existingMetadata, nil
@@ -73,7 +73,10 @@ func mergeMetadata(seriesVersion string, cloudSpec *simplestreams.CloudSpec, new
 			continue
 		}
 		regions[im.RegionName] = true
-		existingCloudSpec := simplestreams.CloudSpec{im.RegionName, im.Endpoint}
+		existingCloudSpec := simplestreams.CloudSpec{
+			Region:   im.RegionName,
+			Endpoint: im.Endpoint,
+		}
 		allCloudSpecs = append(allCloudSpecs, existingCloudSpec)
 	}
 	return toWrite, allCloudSpecs

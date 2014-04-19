@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"strings"
 
+	jc "github.com/juju/testing/checkers"
 	gc "launchpad.net/gocheck"
 
 	"launchpad.net/juju-core/environs"
 	"launchpad.net/juju-core/errors"
 	"launchpad.net/juju-core/instance"
 	"launchpad.net/juju-core/provider/common"
-	jc "launchpad.net/juju-core/testing/checkers"
 	"launchpad.net/juju-core/testing/testbase"
 )
 
@@ -93,7 +93,7 @@ func (s *DestroySuite) TestSuccess(c *gc.C) {
 	err = common.Destroy(env)
 	c.Assert(err, gc.IsNil)
 	_, err = stor.Get("somewhere")
-	c.Assert(err, jc.Satisfies, errors.IsNotFoundError)
+	c.Assert(err, jc.Satisfies, errors.IsNotFound)
 }
 
 func (s *DestroySuite) TestCannotTrashStorageWhenNoInstances(c *gc.C) {
@@ -121,5 +121,5 @@ func (s *DestroySuite) TestSuccessWhenNoInstances(c *gc.C) {
 	err = common.Destroy(env)
 	c.Assert(err, gc.IsNil)
 	_, err = stor.Get("elsewhere")
-	c.Assert(err, jc.Satisfies, errors.IsNotFoundError)
+	c.Assert(err, jc.Satisfies, errors.IsNotFound)
 }

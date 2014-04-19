@@ -15,7 +15,7 @@ import (
 	"launchpad.net/juju-core/version"
 	"launchpad.net/juju-core/worker/uniter"
 	"launchpad.net/juju-core/worker/uniter/jujuc"
-    "launchpad.net/juju-core/utils"
+	"launchpad.net/juju-core/utils"
 )
 
 type ToolsSuite struct {

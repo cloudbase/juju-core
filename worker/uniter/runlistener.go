@@ -70,7 +70,7 @@ func NewRunListener(runner CommandRunner, socketPath string) (*RunListener, erro
 	}
 	listener, err := net.Listen(osenv.SocketType, socketPath)
 	if err != nil {
-		logger.Errorf("failed to listen on %s:%s: %v", osenv.SocketType, socketPath, err)
+		logger.Errorf("failed to listen on unix:%s: %v", socketPath, err)
 		return nil, err
 	}
 	runListener := &RunListener{

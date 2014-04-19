@@ -7,16 +7,15 @@ import (
 	"fmt"
 	"os/exec"
 
+	jc "github.com/juju/testing/checkers"
 	gc "launchpad.net/gocheck"
 
 	"launchpad.net/juju-core/agent"
 	"launchpad.net/juju-core/environs"
-	"launchpad.net/juju-core/environs/config"
 	"launchpad.net/juju-core/instance"
 	"launchpad.net/juju-core/state"
 	apiprovisioner "launchpad.net/juju-core/state/api/provisioner"
-	jc "launchpad.net/juju-core/testing/checkers"
-	"launchpad.net/juju-core/testing/testbase"
+	coretesting "launchpad.net/juju-core/testing"
 	"launchpad.net/juju-core/utils"
 	"launchpad.net/juju-core/version"
 	"launchpad.net/juju-core/worker"
@@ -51,9 +50,8 @@ func noImportance(err0, err1 error) bool {
 func (s *ContainerSetupSuite) SetUpTest(c *gc.C) {
 	s.CommonProvisionerSuite.SetUpTest(c)
 	s.CommonProvisionerSuite.setupEnvironmentManager(c)
-	aptCmdChan, cleanup := testbase.HookCommandOutput(&utils.AptCommandOutput, []byte{}, nil)
+	aptCmdChan := s.HookCommandOutput(&utils.AptCommandOutput, []byte{}, nil)
 	s.aptCmdChan = aptCmdChan
-	s.AddCleanup(func(*gc.C) { cleanup() })
 
 	// Set up provisioner for the state machine.
 	agentConfig := s.AgentConfigForTag(c, "machine-0")
@@ -90,7 +88,7 @@ func (s *ContainerSetupSuite) createContainer(c *gc.C, host *state.Machine, ctyp
 
 	// make a container on the host machine
 	template := state.MachineTemplate{
-		Series: config.DefaultSeries,
+		Series: coretesting.FakeDefaultSeries,
 		Jobs:   []state.MachineJob{state.JobHostUnits},
 	}
 	container, err := s.State.AddMachineInsideMachine(template, host.Id(), ctype)
@@ -133,7 +131,7 @@ func (s *ContainerSetupSuite) TestContainerProvisionerStarted(c *gc.C) {
 	for _, ctype := range instance.ContainerTypes {
 		// create a machine to host the container.
 		m, err := s.BackingState.AddOneMachine(state.MachineTemplate{
-			Series:      config.DefaultSeries,
+			Series:      coretesting.FakeDefaultSeries,
 			Jobs:        []state.MachineJob{state.JobHostUnits},
 			Constraints: s.defaultConstraints,
 		})
@@ -156,7 +154,7 @@ func (s *ContainerSetupSuite) assertContainerInitialised(c *gc.C, ctype instance
 
 	// create a machine to host the container.
 	m, err := s.BackingState.AddOneMachine(state.MachineTemplate{
-		Series:      config.DefaultSeries,
+		Series:      coretesting.FakeDefaultSeries,
 		Jobs:        []state.MachineJob{state.JobHostUnits},
 		Constraints: s.defaultConstraints,
 	})
@@ -182,7 +180,7 @@ func (s *ContainerSetupSuite) TestContainerInitialised(c *gc.C) {
 		ctype    instance.ContainerType
 		packages []string
 	}{
-		{instance.LXC, []string{"lxc"}},
+		{instance.LXC, []string{"--target-release", "precise-updates/cloud-tools", "lxc", "cloud-image-utils"}},
 		{instance.KVM, []string{"uvtool-libvirt", "uvtool"}},
 	} {
 		s.assertContainerInitialised(c, test.ctype, test.packages)
