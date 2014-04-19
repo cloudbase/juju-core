@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+    "runtime"
 
 	"launchpad.net/juju-core/utils"
 )

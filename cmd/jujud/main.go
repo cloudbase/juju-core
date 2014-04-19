@@ -124,9 +124,9 @@ func Main(args []string) {
 	jujuRunName := "juju-run"
 
 	if runtime.GOOS == "windows" {
-		jujudName := "jujud.exe"
-		jujucName := "jujuc.exe"
-		jujuRunName := "juju-run.exe"
+		jujudName = "jujud.exe"
+		jujucName = "jujuc.exe"
+		jujuRunName = "juju-run.exe"
 	}
 	
 	commandName := filepath.Base(args[0])

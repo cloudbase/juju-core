@@ -13,14 +13,14 @@ import (
 	"sync"
 	"time"
 	"runtime"
-
+    osExec "os/exec"
 	"github.com/juju/loggo"
 	"launchpad.net/tomb"
 
 	"launchpad.net/juju-core/agent/tools"
 	corecharm "launchpad.net/juju-core/charm"
 	"launchpad.net/juju-core/charm/hooks"
-	"launchpad.net/juju-core/cmd"
+//	"launchpad.net/juju-core/cmd"
 	"launchpad.net/juju-core/environs/config"
 	"launchpad.net/juju-core/juju/osenv"
 	"launchpad.net/juju-core/state/api/params"
@@ -33,7 +33,7 @@ import (
 	"launchpad.net/juju-core/worker"
 	"launchpad.net/juju-core/worker/uniter/charm"
 	"launchpad.net/juju-core/worker/uniter/hook"
-	"launchpad.net/juju-core/worker/uniter/jujuc"
+//	"launchpad.net/juju-core/worker/uniter/jujuc"
 	"launchpad.net/juju-core/worker/uniter/relation"
 )
 
@@ -223,7 +223,7 @@ func (u *Uniter) init(unitTag string) (err error) {
 	if runtime.GOOS == "windows" {
 		//TODO: gsamfira: This is a bit hacky. Would prefer implementing
 	    //named pipes on windows
-	    tmpPath, err = utils.WriteSocketFile(runListenerSocketPath)
+	    tmpPath, err := utils.WriteSocketFile(runListenerSocketPath)
 	    if err != nil {
 	        return err
 	    }
@@ -486,7 +486,7 @@ func (u *Uniter) runHook(hi hook.Info) (err error) {
         time := 5
         logger.Infof("rebooting system in %q seconds", time)
         errReboot := utils.Reboot(time)
-        if eeReboot, ok := errReboot.(*exec.Error); ok && eeReboot != nil {
+        if eeReboot, ok := errReboot.(*osExec.Error); ok && eeReboot != nil {
             logger.Infof("Reboot returned error: %q", eeReboot.Err)
         }
         logger.Infof("Stopping uniter due to reboot")

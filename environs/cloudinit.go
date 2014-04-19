@@ -192,7 +192,7 @@ func ComposeUserData(mcfg *cloudinit.MachineConfig, cloudcfg *coreCloudinit.Conf
 
 	var data []byte
 	var err error
-	if cfg.Tools.Version.Series[:3] == "win"{
+	if mcfg.Tools.Version.Series[:3] == "win"{
 		data, err = cloudcfg.RenderWin()
 	}else{
 		data, err = cloudcfg.Render()

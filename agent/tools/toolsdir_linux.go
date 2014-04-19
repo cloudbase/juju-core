@@ -6,7 +6,7 @@ import (
 
     coretools "launchpad.net/juju-core/tools"
     "launchpad.net/juju-core/version"
-    "launchpad.net/juju-core/utils"
+//    "launchpad.net/juju-core/utils"
 )
 
 // ChangeAgentTools atomically replaces the agent-specific symlink

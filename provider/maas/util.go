@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+    "path"
 
 	"launchpad.net/goyaml"
 

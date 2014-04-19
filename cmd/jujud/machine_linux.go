@@ -1,9 +1,9 @@
 package main
 
 import (
-    "os"
+    //"os"
     "fmt"
-    "path/filepath"
+    //"path/filepath"
 
     "launchpad.net/juju-core/agent"
     "launchpad.net/juju-core/worker"
@@ -20,6 +20,7 @@ import (
     "launchpad.net/juju-core/provider"
     "launchpad.net/juju-core/worker/provisioner"
     // "launchpad.net/juju-core/utils"
+    "launchpad.net/juju-core/worker/apiaddressupdater"
 )
 
 // APIWorker returns a Worker that connects to the API and starts any

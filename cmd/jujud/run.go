@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+    "path"
 
 	"launchpad.net/gnuflag"
 
@@ -18,6 +19,7 @@ import (
 	"launchpad.net/juju-core/utils/fslock"
 	"launchpad.net/juju-core/worker/uniter"
 	"launchpad.net/juju-core/juju/osenv"
+    "launchpad.net/juju-core/utils"
 )
 
 var (

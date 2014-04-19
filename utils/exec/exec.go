@@ -4,9 +4,9 @@
 package exec
 
 import (
-	"bytes"
+//	"bytes"
 	"os/exec"
-	"syscall"
+//	"syscall"
 
 	"github.com/juju/loggo"
 )

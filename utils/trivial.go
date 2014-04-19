@@ -14,8 +14,10 @@ import (
 	"strings"
 	"unicode"
 	"runtime"
+    "strconv"
 
 	"launchpad.net/goyaml"
+    "launchpad.net/juju-core/utils/exec"
 )
 
 // WriteYaml marshals obj as yaml and then writes it to a file, atomically,

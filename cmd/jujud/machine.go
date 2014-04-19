@@ -38,7 +38,7 @@ import (
 	"launchpad.net/juju-core/utils/voyeur"
 	"launchpad.net/juju-core/version"
 	"launchpad.net/juju-core/worker"
-	"launchpad.net/juju-core/worker/apiaddressupdater"
+	//"launchpad.net/juju-core/worker/apiaddressupdater"
 	"launchpad.net/juju-core/worker/cleaner"
 	"launchpad.net/juju-core/worker/instancepoller"
 	"launchpad.net/juju-core/worker/localstorage"

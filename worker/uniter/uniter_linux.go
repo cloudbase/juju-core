@@ -1,10 +1,10 @@
 package uniter
 
 import (
-    "math/rand"
-    "os"
+    //"math/rand"
+    //"os"
     "path/filepath"
-    "time"
+    //"time"
     "fmt"
 
     "launchpad.net/juju-core/cmd"

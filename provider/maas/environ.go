@@ -451,6 +451,8 @@ func (environ *maasEnviron) StartInstance(args environs.StartInstanceParams) (
 	return inst, nil, networkInfo, nil
 }
 
+
+
 // newCloudinitConfig creates a cloudinit.Config structure
 // suitable as a base for initialising a MAAS node.
 func newCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudinit.Config, error) {
@@ -474,6 +476,12 @@ func newCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudinit
 	return cloudcfg, nil
 }
 
+//TODO: gsamfira: port this on Monday
+func newWinCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudinit.Config, error) {
+	return nil, nil
+}
+
+//TODO: gsamfira: Port setupNetworksOnBoot
 // setupNetworksOnBoot prepares a script to enable and start all given
 // networks on boot.
 func setupNetworksOnBoot(cloudcfg *cloudinit.Config, networkInfo []network.Info) {
