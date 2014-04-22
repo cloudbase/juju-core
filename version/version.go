@@ -33,6 +33,20 @@ const version = "1.19.1"
 // the release version of ubuntu.
 var lsbReleaseFile = "/etc/lsb-release"
 
+
+// Windows versions come in various flavors:
+// Standard, Datacenter, etc. We use regex to match them to one
+// of the following. Specify the longest name in a particular serie first
+// For example, if we have "Win 2012" and "Win 2012 R2". we specify "Win 2012 R2" first
+var WindowsVersions = map[string]string{
+    "Microsoft Hyper-V Server 2012 R2": "win2012hvr2",
+    "Microsoft Hyper-V Server 2012": "win2012hv",
+    "Microsoft Windows Server 2012 R2": "win2012r2",
+    "Microsoft Windows Server 2012": "win2012",
+    "Windows Storage Server 2012 R2": "win2012r2",
+    "Windows Storage Server 2012": "win2012",
+}
+
 // Current gives the current version of the system.  If the file
 // "FORCE-VERSION" is present in the same directory as the running
 // binary, it will override this.
@@ -331,4 +345,13 @@ func ParseMajorMinor(vers string) (int, int, error) {
 		return -1, -1, fmt.Errorf("invalid major.minor version number %s", vers)
 	}
 	return major, minor, nil
+}
+
+func IsWindows(serie string) bool{
+	for _, val := range WindowsVersions {
+		if serie == val {
+			return true
+		}
+	}
+	return false
 }

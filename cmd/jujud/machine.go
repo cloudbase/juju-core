@@ -663,7 +663,11 @@ func (a *MachineAgent) createJujuRun(dataDir string) error {
 	if err := os.Remove(jujuRun); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	jujud := filepath.Join(dataDir, "tools", a.Tag(), "jujud")
+	jujuName := "jujud"
+	if runtime.GOOS == "windows" {
+		jujuName = "jujud.exe"
+	}
+	jujud := filepath.Join(dataDir, "tools", a.Tag(), jujuName)
 	return utils.Symlink(jujud, jujuRun)
 }
 

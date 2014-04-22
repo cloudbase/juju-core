@@ -1040,7 +1040,7 @@ func NixConfigureBasic(cfg *MachineConfig, c *cloudinit.Config) error {
 // but adds to the running time of initialisation due to lack of activity
 // between image bringup and start of agent installation.
 func ConfigureBasic(cfg *MachineConfig, c *cloudinit.Config) error {
-	if cfg.Tools.Version.Series[:3] == "win"{
+	if version.IsWindows(cfg.Tools.Version.Series){
 		return WinConfigureBasic(cfg, c)
 	}
 	return NixConfigureBasic(cfg, c)
@@ -1073,7 +1073,7 @@ func AddAptCommands(proxy osenv.ProxySettings, c *cloudinit.Config) {
 }
 
 func ConfigureJuju(cfg *MachineConfig, c *cloudinit.Config) error {
-	if cfg.Tools.Version.Series[:3] == "win"{
+	if version.IsWindows(cfg.Tools.Version.Series){
 		return WinConfigureJuju(cfg, c)
 	}
 	return NixConfigureJuju(cfg, c)
@@ -1297,7 +1297,7 @@ func (cfg *MachineConfig) addAgentInfo(c *cloudinit.Config, tag string) (agent.C
 	if err != nil {
 		return nil, errgo.Annotate(err, "failed to write commands")
 	}
-	if series[:3] == "win"{
+	if version.IsWindows(series){
 		c.AddPSScripts(cmds...)
 	}else{
 		c.AddScripts(cmds...)

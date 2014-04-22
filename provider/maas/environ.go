@@ -33,6 +33,7 @@ import (
 	"launchpad.net/juju-core/tools"
 	"launchpad.net/juju-core/utils"
 	"launchpad.net/juju-core/utils/set"
+	"launchpad.net/juju-core/version"
 )
 
 const (
@@ -431,7 +432,10 @@ func (environ *maasEnviron) StartInstance(args environs.StartInstanceParams) (
 	// The machine envronment config values are being moved to the agent config.
 	// Explicitly specify that the lxc containers use the network bridge defined above.
 	args.MachineConfig.AgentEnvironment[agent.LxcBridge] = "br0"
-	cloudcfg, err := newCloudinitConfig(hostname, networkInfo)
+
+	series := args.Tools.OneSeries()
+	cloudcfg, err := newCloudinitConfig(hostname, networkInfo, series)
+
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -442,7 +446,6 @@ func (environ *maasEnviron) StartInstance(args environs.StartInstanceParams) (
 	}
 	logger.Debugf("maas user data; %d bytes", len(userdata))
 
-	series := args.Tools.OneSeries()
 	if err := environ.startNode(*inst.maasObject, series, userdata); err != nil {
 		return nil, nil, nil, err
 	}
@@ -451,11 +454,19 @@ func (environ *maasEnviron) StartInstance(args environs.StartInstanceParams) (
 	return inst, nil, networkInfo, nil
 }
 
-
+func newCloudinitConfig(hostname string, networkInfo []network.Info, serie string) (*cloudinit.Config, error) {
+	logger.Infof("Making cloudinit cfg for %s", serie)
+	if version.IsWindows(serie){
+		logger.Infof("validated as WINDOWS")
+		return newWinCloudinitConfig(hostname, networkInfo)
+	}
+	logger.Infof("validated as LINUX")
+	return newNixCloudinitConfig(hostname, networkInfo)
+}
 
 // newCloudinitConfig creates a cloudinit.Config structure
 // suitable as a base for initialising a MAAS node.
-func newCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudinit.Config, error) {
+func newNixCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudinit.Config, error) {
 	info := machineInfo{hostname}
 	runCmd, err := info.cloudinitRunCmd()
 	if err != nil {
@@ -478,7 +489,17 @@ func newCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudinit
 
 //TODO: gsamfira: port this on Monday
 func newWinCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudinit.Config, error) {
-	return nil, nil
+	info := machineInfo{hostname}
+	runCmd, err := info.winCloudinitRunCmd()
+	if err != nil {
+		return nil, err
+	}
+	cloudcfg := cloudinit.New()
+	logger.Infof("Adding script for WINDOWS: %v", runCmd)
+	cloudcfg.AddPSScripts(
+		runCmd,
+	)
+	return cloudcfg, nil
 }
 
 //TODO: gsamfira: Port setupNetworksOnBoot

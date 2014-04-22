@@ -21,6 +21,7 @@ import (
 	"launchpad.net/juju-core/state/api"
 	"launchpad.net/juju-core/state/api/params"
 	"launchpad.net/juju-core/utils"
+	"launchpad.net/juju-core/version"
 )
 
 // DataDir is the default data directory.
@@ -39,7 +40,7 @@ func NewMachineConfig(machineID, machineNonce, machineSeries string, includeNetw
 
 	localDataDir := DataDir
 	localLogDir := agent.DefaultLogDir
-	if len(machineSeries) > 3 && machineSeries[:3] == "win"{
+	if len(machineSeries) > 3 && version.IsWindows(machineSeries){
 		localDataDir = osenv.WinDataDir
 		localLogDir = osenv.WinLogDir
 	}
@@ -192,7 +193,7 @@ func ComposeUserData(mcfg *cloudinit.MachineConfig, cloudcfg *coreCloudinit.Conf
 
 	var data []byte
 	var err error
-	if mcfg.Tools.Version.Series[:3] == "win"{
+	if version.IsWindows(mcfg.Tools.Version.Series){
 		data, err = cloudcfg.RenderWin()
 	}else{
 		data, err = cloudcfg.Render()

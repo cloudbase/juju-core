@@ -1,9 +1,9 @@
 package main
 
 import (
-    "os"
+    // "os"
     "fmt"
-    "path/filepath"
+    // "path/filepath"
 
     "launchpad.net/juju-core/agent"
     "launchpad.net/juju-core/worker"
@@ -16,6 +16,7 @@ import (
     "launchpad.net/juju-core/worker/machiner"
     // "launchpad.net/juju-core/worker/rsyslog"
     "launchpad.net/juju-core/worker/upgrader"
+    "launchpad.net/juju-core/worker/apiaddressupdater"
     "launchpad.net/juju-core/state/api/params"
     // "launchpad.net/juju-core/provider"
     "launchpad.net/juju-core/worker/provisioner"
@@ -52,7 +53,7 @@ func (a *MachineAgent) APIWorker() (worker.Worker, error) {
 		}
 	}
 
-	rsyslogMode := rsyslog.RsyslogModeForwarding
+	// rsyslogMode := rsyslog.RsyslogModeForwarding
 	runner := newRunner(connectionIsFatal(st), moreImportant)
 	var singularRunner worker.Runner
 	/*

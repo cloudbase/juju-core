@@ -90,8 +90,8 @@ func (ctx *HookContext) runCharmHook(hookName, charmDir string, env []string) er
 		}
 		return err
 	}
-	com := ctx.getCommand(suffixedHook, suffix)
-	logger.Infof("Running hook file: %q", suffixedHook)
+	com := ctx.getCommand(hook, suffix)
+	logger.Infof("Running hook file: %q", hook)
 	
 	ps := exec.Command(com[0], com[1:]...)
 	ps.Env = env

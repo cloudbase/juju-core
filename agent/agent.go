@@ -589,7 +589,7 @@ func (c *configInternal) fileContents() ([]byte, error) {
 }
 
 func (c *configInternal) WriteCommands(serie string) ([]string, error) {
-	if serie[:3] == "win"{
+	if version.IsWindows(serie) {
 		return c.winWriteCommands()
 	}
 	return c.writeCommands()
