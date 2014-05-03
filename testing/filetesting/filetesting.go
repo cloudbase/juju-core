@@ -165,7 +165,7 @@ func (s Symlink) Create(c *gc.C, basePath string) Entry {
 }
 
 func (s Symlink) Check(c *gc.C, basePath string) Entry {
-	link, err := os.Readlink(join(basePath, s.Path))
+	link, err := utils.Readlink(join(basePath, s.Path))
 	c.Check(err, gc.IsNil)
 	c.Check(link, gc.Equals, s.Link)
 	return s

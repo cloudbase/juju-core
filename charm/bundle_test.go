@@ -224,7 +224,7 @@ func (s *BundleSuite) TestBundleFileModes(c *gc.C) {
 	c.Assert(info.Mode()&0777, gc.Equals, os.FileMode(0755))
 
 	if haveSymlinks {
-		target, err := os.Readlink(filepath.Join(path, "hooks", "symlink"))
+		target, err := utils.Readlink(filepath.Join(path, "hooks", "symlink"))
 		c.Assert(err, gc.IsNil)
 		c.Assert(target, gc.Equals, "../target")
 	}

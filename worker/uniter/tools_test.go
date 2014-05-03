@@ -39,7 +39,7 @@ func (s *ToolsSuite) TestEnsureJujucSymlinks(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	assertLink := func(path string) time.Time {
-		target, err := os.Readlink(path)
+		target, err := utils.Readlink(path)
 		c.Assert(err, gc.IsNil)
 		c.Assert(target, gc.Equals, "./jujud")
 		fi, err := os.Lstat(path)

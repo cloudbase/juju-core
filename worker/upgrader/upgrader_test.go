@@ -219,7 +219,7 @@ func (s *UpgraderSuite) TestChangeAgentTools(c *gc.C) {
 	}
 	err = ugErr.ChangeAgentTools()
 	c.Assert(err, gc.IsNil)
-	link, err := os.Readlink(agenttools.ToolsDir(s.DataDir(), "anAgent"))
+	link, err := utils.Readlink(agenttools.ToolsDir(s.DataDir(), "anAgent"))
 	c.Assert(err, gc.IsNil)
 	c.Assert(link, gc.Equals, newTools.Version.String())
 }

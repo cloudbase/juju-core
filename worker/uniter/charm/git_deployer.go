@@ -204,7 +204,7 @@ func (d *gitDeployer) upgrade() error {
 // repos are orphans, and all will be deleted; this should only be the case when
 // converting a gitDeployer to a manifestDeployer.
 func collectGitOrphans(dataPath string) {
-	current, err := os.Readlink(filepath.Join(dataPath, gitCurrentPath))
+	current, err := utils.Readlink(filepath.Join(dataPath, gitCurrentPath))
 	if os.IsNotExist(err) {
 		logger.Warningf("no current staging repo")
 	} else if err != nil {

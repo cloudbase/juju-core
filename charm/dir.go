@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"launchpad.net/juju-core/utils"
 )
 
 // The Dir type encapsulates access to data and operations
@@ -200,7 +202,7 @@ func (zp *zipPacker) visit(path string, fi os.FileInfo, err error) error {
 	}
 	var data []byte
 	if mode&os.ModeSymlink != 0 {
-		target, err := os.Readlink(path)
+		target, err := utils.Readlink(path)
 		if err != nil {
 			return err
 		}

@@ -13,6 +13,8 @@ import (
 
 	ft "launchpad.net/juju-core/testing/filetesting"
 	"launchpad.net/juju-core/testing/testbase"
+
+	"launchpad.net/juju-core/utils"
 )
 
 type EntrySuite struct {
@@ -141,7 +143,7 @@ func (s *EntrySuite) TestDirCheckFailureFile(c *gc.C) {
 
 func (s *EntrySuite) TestSymlinkCreate(c *gc.C) {
 	ft.Symlink{"link", "target"}.Create(c, s.basePath)
-	target, err := os.Readlink(s.join("link"))
+	target, err := utils.Readlink(s.join("link"))
 	c.Assert(err, gc.IsNil)
 	c.Assert(target, gc.Equals, "target")
 }

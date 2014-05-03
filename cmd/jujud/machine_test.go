@@ -822,7 +822,7 @@ func (s *MachineSuite) TestMachineAgentSymlinkJujuRunExists(c *gc.C) {
 		// juju-run should have been recreated
 		_, err := os.Stat(jujuRun)
 		c.Assert(err, gc.IsNil)
-		link, err := os.Readlink(jujuRun)
+		link, err := utils.Readlink(jujuRun)
 		c.Assert(err, gc.IsNil)
 		c.Assert(link, gc.Not(gc.Equals), "/nowhere/special")
 	})

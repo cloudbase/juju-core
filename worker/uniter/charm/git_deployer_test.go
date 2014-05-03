@@ -207,7 +207,7 @@ func checkCleanup(c *gc.C, d charm.Deployer) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(updateDirs, gc.HasLen, 1)
 	deployerCurrent := charm.GitDeployerCurrent(d)
-	current, err := os.Readlink(deployerCurrent.Path())
+	current, err := utils.Readlink(deployerCurrent.Path())
 	c.Assert(err, gc.IsNil)
 	c.Assert(updateDirs[0], gc.Equals, current)
 

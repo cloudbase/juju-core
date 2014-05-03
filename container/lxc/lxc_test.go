@@ -27,6 +27,8 @@ import (
 	instancetest "launchpad.net/juju-core/instance/testing"
 	"launchpad.net/juju-core/juju/osenv"
 	"launchpad.net/juju-core/testing/testbase"
+
+	"launchpad.net/juju-core/utils"
 )
 
 func Test(t *stdtesting.T) {
@@ -149,7 +151,7 @@ func (s *LxcSuite) TestCreateContainer(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(linkInfo.Mode()&os.ModeSymlink, gc.Equals, os.ModeSymlink)
 
-	location, err := os.Readlink(expectedLinkLocation)
+	location, err := utils.Readlink(expectedLinkLocation)
 	c.Assert(err, gc.IsNil)
 	c.Assert(location, gc.Equals, expectedTarget)
 }
