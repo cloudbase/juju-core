@@ -957,6 +957,7 @@ $hostname = hostname
 $juju_user = "$hostname\jujud"
 
 SetUserLogonAsServiceRights $juju_user
+SetAssignPrimaryTokenPrivilege $juju_user
 
 $secpasswd = ConvertTo-SecureString $juju_passwd -AsPlainText -Force
 $jujuCreds = New-Object System.Management.Automation.PSCredential ($juju_user, $secpasswd)
