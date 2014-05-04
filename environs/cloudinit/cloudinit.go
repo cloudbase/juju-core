@@ -1321,7 +1321,7 @@ func MachineAgentWindowsService(name, toolsDir, dataDir, logDir, tag, machineId 
 
     cmd := []string{
     	fmt.Sprintf(`New-Service -Credential $jujuCreds -Name '%s' -DisplayName 'Jujud machine agent' '%s'`, name, serviceString),
-        fmt.Sprintf(`cmd.exe /C sc config %s start=delayed-auto`, name)
+        fmt.Sprintf(`cmd.exe /C sc config %s start=delayed-auto`, name),
     	fmt.Sprintf(`Start-Service %s`, name),
     }
     return cmd
