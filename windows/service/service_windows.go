@@ -163,10 +163,22 @@ func (c *Cmd) Install() error{
         "}",
     }
     outCmd, errCmd := exec.RunCommand(cmd)
-    logger.Infof("ERROR installing service %v --> %v", outCmd, errCmd)
+    
     if errCmd != nil {
+        logger.Infof("ERROR installing service %v --> %v", outCmd, errCmd)
         return errCmd
     }
+
+    delayedCmd := []string{
+        fmt.Sprintf(`sc config %s start=delayed-auto`, c.Service.Name),
+    }
+
+    delayedCmd, errDelayed := exec.RunCommand(delayedCmd)
+    if errCmd != nil {
+        logger.Infof("ERROR setting %s to delay start: %v --> %v", c.Service.Name, delayedCmd, errDelayed)
+        return errCmd
+    }
+
     return c.Service.Start()
 }
 
