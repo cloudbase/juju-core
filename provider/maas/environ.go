@@ -434,7 +434,7 @@ func (environ *maasEnviron) StartInstance(args environs.StartInstanceParams) (
 	args.MachineConfig.AgentEnvironment[agent.LxcBridge] = "br0"
 
 	series := args.Tools.OneSeries()
-	cloudcfg, err := newCloudinitConfig(hostname, networkInfo, series)
+	cloudcfg, err := newCloudinitConfig(hostname, networkInfo, series, inst)
 
 	if err != nil {
 		return nil, nil, nil, err
@@ -454,19 +454,19 @@ func (environ *maasEnviron) StartInstance(args environs.StartInstanceParams) (
 	return inst, nil, networkInfo, nil
 }
 
-func newCloudinitConfig(hostname string, networkInfo []network.Info, serie string) (*cloudinit.Config, error) {
+func newCloudinitConfig(hostname string, networkInfo []network.Info, serie string, inst *maasInstance) (*cloudinit.Config, error) {
 	logger.Infof("Making cloudinit cfg for %s", serie)
 	if version.IsWindows(serie){
 		logger.Infof("validated as WINDOWS")
-		return newWinCloudinitConfig(hostname, networkInfo)
+		return newWinCloudinitConfig(hostname, networkInfo, inst)
 	}
 	logger.Infof("validated as LINUX")
-	return newNixCloudinitConfig(hostname, networkInfo)
+	return newNixCloudinitConfig(hostname, networkInfo, inst)
 }
 
 // newCloudinitConfig creates a cloudinit.Config structure
 // suitable as a base for initialising a MAAS node.
-func newNixCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudinit.Config, error) {
+func newNixCloudinitConfig(hostname string, networkInfo []network.Info, inst *maasInstance) (*cloudinit.Config, error) {
 	info := machineInfo{hostname}
 	runCmd, err := info.cloudinitRunCmd()
 	if err != nil {
@@ -488,7 +488,19 @@ func newNixCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudi
 }
 
 //TODO: gsamfira: port this on Monday
-func newWinCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudinit.Config, error) {
+func newWinCloudinitConfig(hostname string, networkInfo []network.Info, inst *maasInstance) (*cloudinit.Config, error) {
+	renameInterface := `
+	$count = 0
+	foreach ($i in $ipAddrs.Split(",")){
+		$int = Get-NetIPAddress -IPAddress $i
+		if($int) {
+			Rename-NetAdapter -Name $int.InterfaceAlias -NewName "Management$count"
+			$count += 1
+			continue
+		}
+	}
+	`
+	ips, _ := inst.ipAddresses()
 	info := machineInfo{hostname}
 	runCmd, err := info.winCloudinitRunCmd()
 	if err != nil {
@@ -499,6 +511,12 @@ func newWinCloudinitConfig(hostname string, networkInfo []network.Info) (*cloudi
 	cloudcfg.AddPSScripts(
 		runCmd,
 	)
+	if ips != nil{
+		cloudcfg.AddPSScripts(
+			fmt.Sprintf(`$ipAddrs = "%s"`, strings.Join(ips, ",")),
+			renameInterface,
+		)
+	}
 	return cloudcfg, nil
 }
 
