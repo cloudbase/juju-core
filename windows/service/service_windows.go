@@ -173,9 +173,9 @@ func (c *Cmd) Install() error{
         fmt.Sprintf(`sc config %s start=delayed-auto`, c.Service.Name),
     }
 
-    delayedCmd, errDelayed := exec.RunCommand(delayedCmd)
+    delayedOutCmd, errDelayed := exec.RunCommand(delayedCmd)
     if errCmd != nil {
-        logger.Infof("ERROR setting %s to delay start: %v --> %v", c.Service.Name, delayedCmd, errDelayed)
+        logger.Infof("ERROR setting %s to delay start: %v --> %v", c.Service.Name, delayedOutCmd, errDelayed)
         return errCmd
     }
 
