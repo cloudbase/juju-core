@@ -170,10 +170,15 @@ func (c *Cmd) Install() error{
     }
 
     delayedCmd := []string{
-        fmt.Sprintf(`sc config %s start=delayed-auto`, c.Service.Name),
+        "powershell",
+        "Invoke-Command {",
+        fmt.Sprintf(`cmd.exe /C call sc config %s start=delayed-auto`, c.Service.Name),
+        exec.CheckError,
+        "}",
     }
     logger.Infof("INFO Running: sc config %s start=delayed-auto", c.Service.Name)
     delayedOutCmd, errDelayed := exec.RunCommand(delayedCmd)
+    logger.Infof("INFO SC command result: %v --> %v", delayedOutCmd, errDelayed)
     if errCmd != nil {
         logger.Infof("ERROR setting %s to delay start: %v --> %v", c.Service.Name, delayedOutCmd, errDelayed)
         return errCmd
