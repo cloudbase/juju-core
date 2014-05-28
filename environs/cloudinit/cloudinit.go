@@ -976,6 +976,16 @@ Param (
 
 `
 
+var winTestOrCreateLibDir = `
+
+$jujuDataDir = "%s"
+$hasLibDir = Test-Path $jujuDataDir
+if (!$hasLibDir){
+	mkdir $jujuDataDir
+}
+
+`
+
 func WinConfigureBasic(cfg *MachineConfig, c *cloudinit.Config) error {
 	zipUrl := "https://www.cloudbase.it/downloads/7z920-x64.msi"
 	gitUrl := "https://www.cloudbase.it/downloads/Git-1.8.5.2-preview20131230.exe"
@@ -984,6 +994,7 @@ func WinConfigureBasic(cfg *MachineConfig, c *cloudinit.Config) error {
 
 	c.AddPSScripts(
 		fmt.Sprintf(`%s`, winPowershellHelperFunctions),
+		fmt.Sprintf(winTestOrCreateLibDir, utils.PathToWindows(osenv.WinDataDir)),
 		fmt.Sprintf(`icacls "%s" /grant "jujud:(OI)(CI)(F)" /T`, utils.PathToWindows(osenv.WinBaseDir)),
 		fmt.Sprintf(`mkdir %s`, utils.PathToWindows(osenv.WinTempDir)),
 		fmt.Sprintf(`ExecRetry { (new-object System.Net.WebClient).DownloadFile("%s", "%s") }`,

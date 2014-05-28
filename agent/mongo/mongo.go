@@ -311,7 +311,7 @@ func aptGetInstallMongod() error {
 	}
 	pkg := packageForSeries(version.Current.Series)
 	cmds := utils.AptGetPreparePackages([]string{pkg}, version.Current.Series)
-	logger.Infof("installing %s", pkg)
+	logger.Infof("installing %s for series %s", pkg, version.Current.Series)
 	for _, cmd := range cmds {
 		if err := utils.AptGetInstall(cmd...); err != nil {
 			return err

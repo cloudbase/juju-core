@@ -91,6 +91,7 @@ func targetRelease(series string) string {
 // should the series be an LTS release with cloud archive packages.
 func AptGetPreparePackages(packages []string, series string) [][]string {
 	var installCommands [][]string
+	aptLogger.Infof("Target release is: %s", series)
 	if target := targetRelease(series); target == "" {
 		return append(installCommands, packages)
 	} else {
