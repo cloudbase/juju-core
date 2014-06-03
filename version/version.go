@@ -35,6 +35,7 @@ var lsbReleaseFile = "/etc/lsb-release"
 // of the following. Specify the longest name in a particular serie first
 // For example, if we have "Win 2012" and "Win 2012 R2". we specify "Win 2012 R2" first
 var WindowsVersions = map[string]string{
+	"Microsoft Windows 8.1": "win81",
 	"Microsoft Hyper-V Server 2012 R2": "win2012hvr2",
 	"Microsoft Hyper-V Server 2012":    "win2012hv",
 	"Microsoft Windows Server 2012 R2": "win2012r2",

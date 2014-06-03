@@ -28,6 +28,7 @@ var seriesVersions = map[string]string{
 	"win2012hvr2": "win2012hvr2",
 	"win2012":     "win2012",
 	"win2012r2":   "win2012r2",
+	"win81": "win81",
 }
 
 // SeriesVersion returns the version number for the specified Ubuntu series.
