@@ -5,14 +5,12 @@ package tools_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"path/filepath"
 
 	gc "launchpad.net/gocheck"
 
 	agenttools "launchpad.net/juju-core/agent/tools"
 	coretesting "launchpad.net/juju-core/testing"
-	"launchpad.net/juju-core/testing/testbase"
 	coretools "launchpad.net/juju-core/tools"
 	"launchpad.net/juju-core/version"
 )
@@ -22,13 +20,13 @@ var _ = gc.Suite(&DiskManagerSuite{})
 var _ agenttools.ToolsManager = (*agenttools.DiskManager)(nil)
 
 type DiskManagerSuite struct {
-	testbase.LoggingSuite
+	coretesting.BaseSuite
 	dataDir string
 	manager agenttools.ToolsManager
 }
 
 func (s *DiskManagerSuite) SetUpTest(c *gc.C) {
-	s.LoggingSuite.SetUpTest(c)
+	s.BaseSuite.SetUpTest(c)
 	s.dataDir = c.MkDir()
 	s.manager = agenttools.NewDiskManager(s.dataDir)
 }
@@ -80,25 +78,4 @@ func (t *DiskManagerSuite) TestSharedToolsDir(c *gc.C) {
 	manager := agenttools.NewDiskManager("/var/lib/juju")
 	dir := manager.SharedToolsDir(version.MustParseBinary("1.2.3-precise-amd64"))
 	c.Assert(dir, gc.Equals, "/var/lib/juju/tools/1.2.3-precise-amd64")
-}
-
-// assertToolsContents asserts that the directory for the tools
-// has the given contents.
-func (s *DiskManagerSuite) assertToolsContents(c *gc.C, t *coretools.Tools, files []*coretesting.TarFile) {
-	var wantNames []string
-	for _, f := range files {
-		wantNames = append(wantNames, f.Header.Name)
-	}
-	wantNames = append(wantNames, toolsFile)
-	dir := s.manager.(*agenttools.DiskManager).SharedToolsDir(t.Version)
-	assertDirNames(c, dir, wantNames)
-	expectedFileContents, err := json.Marshal(t)
-	c.Assert(err, gc.IsNil)
-	assertFileContents(c, dir, toolsFile, string(expectedFileContents), 0200)
-	for _, f := range files {
-		assertFileContents(c, dir, f.Header.Name, f.Contents, 0400)
-	}
-	gotTools, err := s.manager.ReadTools(t.Version)
-	c.Assert(err, gc.IsNil)
-	c.Assert(*gotTools, gc.Equals, *t)
 }

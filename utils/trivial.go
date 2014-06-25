@@ -8,16 +8,16 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"runtime"
+	"strconv"
 	"strings"
 	"unicode"
-	"runtime"
 
 	"launchpad.net/goyaml"
+	"launchpad.net/juju-core/utils/exec"
 )
 
 // WriteYaml marshals obj as yaml and then writes it to a file, atomically,
@@ -33,13 +33,13 @@ func WriteYaml(path string, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	if runtime.GOOS != "windows"{
+	if runtime.GOOS != "windows" {
 		defer f.Close()
 	}
 	if _, err = f.Write(data); err != nil {
 		return err
 	}
-	if runtime.GOOS == "windows"{
+	if runtime.GOOS == "windows" {
 		f.Close()
 	}
 	return ReplaceFile(prep, path)
@@ -53,15 +53,6 @@ func ReadYaml(path string, obj interface{}) error {
 		return err
 	}
 	return goyaml.Unmarshal(data, obj)
-}
-
-// ErrorContextf prefixes any error stored in err with text formatted
-// according to the format specifier. If err does not contain an error,
-// ErrorContextf does nothing.
-func ErrorContextf(err *error, format string, args ...interface{}) {
-	if *err != nil {
-		*err = errors.New(fmt.Sprintf(format, args...) + ": " + (*err).Error())
-	}
 }
 
 // ShQuote quotes s so that when read by bash, no metacharacters
@@ -156,4 +147,21 @@ func ReadFileSHA256(filename string) (string, int64, error) {
 //generation windows paths on linux
 func PathToWindows(filepath string) string {
 	return strings.Replace(filepath, "/", "\\", -1)
+}
+
+func Reboot(when int) error {
+	cmd := []string{
+		"shutdown",
+		"-r",
+	}
+
+	if runtime.GOOS == "windows" {
+		cmd = append(cmd, "-t")
+	}
+	cmd = append(cmd, strconv.Itoa(when))
+	_, err := exec.RunCommand(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
 }

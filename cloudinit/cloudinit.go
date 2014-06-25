@@ -32,7 +32,7 @@ func (cfg *Config) Render() ([]byte, error) {
 	return append([]byte("#cloud-config\n"), data...), nil
 }
 
-// Render returns the cloud-init configuration as a YAML file.
+// Render returns a ps1_sysnative script to be run by cloudbase-init
 func (cfg *Config) RenderWin() ([]byte, error) {
 	// data, err := yaml.Marshal(cfg.attrs)
 	winCmds := cfg.attrs["powershell"]
@@ -40,9 +40,9 @@ func (cfg *Config) RenderWin() ([]byte, error) {
 	header := "#ps1_sysnative\r\n"
 	script = append(script, header...)
 	for _, value := range winCmds.([]*command) {
-            script = append(script, value.literal...)
-            
-    }
+		script = append(script, value.literal...)
+
+	}
 	return script, nil
 }
 
